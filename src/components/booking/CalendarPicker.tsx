@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSalon } from '@/contexts/SalonContext';
 import { cn } from '@/lib/utils';
+import { formatDateToBrazil } from '@/lib/dateUtils';
 
 interface CalendarPickerProps {
   professionalId: string;
@@ -42,7 +43,7 @@ export function CalendarPicker({ professionalId, selectedDate, onSelect }: Calen
 
   const formatDateString = (day: number) => {
     const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-    return date.toISOString().split('T')[0];
+    return formatDateToBrazil(date);
   };
 
   const isSelected = (day: number) => {

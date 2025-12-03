@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ChevronLeft, ChevronRight, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { formatDateToBrazil } from '@/lib/dateUtils';
 
 export default function Agenda() {
   const { appointments, services, professionals, cancelAppointment } = useSalon();
@@ -30,7 +31,7 @@ export default function Agenda() {
   };
 
   const formatDateString = (date: Date) => {
-    return date.toISOString().split('T')[0];
+    return formatDateToBrazil(date);
   };
 
   const goToPrev = () => {

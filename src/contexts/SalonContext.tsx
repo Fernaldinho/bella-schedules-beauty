@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Professional, Service, Appointment, SalonSettings, Subscription, Client } from '@/types/salon';
 import { professionals as defaultProfessionals, services as defaultServices, sampleAppointments, defaultSalonSettings } from '@/data/salonData';
+import { getDayOfWeekFromDateString } from '@/lib/dateUtils';
 
 interface SalonContextType {
   professionals: Professional[];
@@ -95,7 +96,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
     const professional = professionals.find(p => p.id === professionalId);
     if (!professional) return [];
     
-    const dayOfWeek = new Date(date).getDay();
+    const dayOfWeek = getDayOfWeekFromDateString(date);
     if (!professional.availableDays.includes(dayOfWeek)) return [];
     
     const allSlots = generateTimeSlots(professional.availableHours.start, professional.availableHours.end);
