@@ -1,7 +1,8 @@
-import { CheckCircle, Calendar, Clock, User, Sparkles, MessageCircle } from 'lucide-react';
+import { CheckCircle, Calendar, Clock, User, Sparkles, MessageCircle, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Service, Professional } from '@/types/salon';
 import { useSalon } from '@/contexts/SalonContext';
+import { Link } from 'react-router-dom';
 
 interface BookingSuccessProps {
   service: Service;
@@ -46,6 +47,16 @@ export function BookingSuccess({
 
   return (
     <div className="text-center space-y-6 animate-fade-in-up">
+      {/* Home Button */}
+      <div className="flex justify-start">
+        <Button asChild variant="ghost" className="gap-2">
+          <Link to="/">
+            <Home className="w-4 h-4" />
+            Voltar
+          </Link>
+        </Button>
+      </div>
+
       <div className="w-20 h-20 gradient-primary rounded-full flex items-center justify-center mx-auto shadow-glow animate-scale-in">
         <CheckCircle className="w-10 h-10 text-primary-foreground" />
       </div>
@@ -126,6 +137,13 @@ export function BookingSuccess({
           onClick={onNewBooking}
         >
           Fazer Novo Agendamento
+        </Button>
+
+        <Button asChild variant="outline" size="lg" className="w-full">
+          <Link to="/">
+            <Home className="w-4 h-4 mr-2" />
+            Voltar para Início
+          </Link>
         </Button>
       </div>
     </div>

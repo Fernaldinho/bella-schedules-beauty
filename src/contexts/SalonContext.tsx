@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Professional, Service, Appointment, SalonSettings, Subscription, Client, ThemePreset } from '@/types/salon';
+import { Professional, Service, Appointment, SalonSettings, Subscription, Client, ThemePreset, CustomColors } from '@/types/salon';
 import { professionals as defaultProfessionals, services as defaultServices, sampleAppointments, defaultSalonSettings } from '@/data/salonData';
 import { getDayOfWeekFromDateString } from '@/lib/dateUtils';
 
@@ -24,6 +24,7 @@ interface SalonContextType {
   activateSubscription: () => void;
   getAvailableSlots: (professionalId: string, date: string) => string[];
   isSlotBooked: (professionalId: string, date: string, time: string) => boolean;
+  getProfessionalsForService: (serviceId: string) => Professional[];
 }
 
 const SalonContext = createContext<SalonContextType | undefined>(undefined);
@@ -37,32 +38,48 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   const [subscription, setSubscription] = useState<Subscription>({
     isActive: false,
     plan: null,
-    price: 87.30,
+    price: 45.30,
     expiresAt: null,
   });
 
-  const applyTheme = (theme: ThemePreset) => {
-    const themes = {
+  const applyTheme = (themePreset: ThemePreset, customColors?: CustomColors, priceColor?: string) => {
+    const presetThemes = {
       purple: {
-        '--primary': '270 70% 50%',
-        '--primary-foreground': '0 0% 100%',
-        '--accent': '330 80% 60%',
+        primary: '270 70% 50%',
+        secondary: '320 70% 60%',
+        accent: '330 80% 60%',
       },
       rose: {
-        '--primary': '350 80% 55%',
-        '--primary-foreground': '0 0% 100%',
-        '--accent': '350 70% 70%',
+        primary: '350 80% 55%',
+        secondary: '340 70% 65%',
+        accent: '350 70% 70%',
       },
       gold: {
-        '--primary': '45 90% 40%',
-        '--primary-foreground': '0 0% 100%',
-        '--accent': '45 90% 55%',
+        primary: '45 90% 40%',
+        secondary: '40 85% 50%',
+        accent: '45 90% 55%',
+      },
+      custom: customColors || {
+        primary: '280 60% 50%',
+        secondary: '320 70% 60%',
+        accent: '340 80% 65%',
       },
     };
-    const themeCSS = themes[theme];
-    Object.entries(themeCSS).forEach(([key, value]) => {
-      document.documentElement.style.setProperty(key, value);
-    });
+    
+    const colors = presetThemes[themePreset];
+    
+    document.documentElement.style.setProperty('--primary', colors.primary);
+    document.documentElement.style.setProperty('--primary-foreground', '0 0% 100%');
+    document.documentElement.style.setProperty('--accent', colors.accent);
+    
+    // Apply price color
+    if (priceColor) {
+      document.documentElement.style.setProperty('--price-color', priceColor);
+    }
+    
+    // Update gradient
+    const gradientPrimary = `linear-gradient(135deg, hsl(${colors.primary}) 0%, hsl(${colors.secondary}) 50%, hsl(${colors.accent}) 100%)`;
+    document.documentElement.style.setProperty('--gradient-primary', gradientPrimary);
   };
 
   // Load from localStorage
@@ -80,15 +97,20 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
     const savedSettings = localStorage.getItem('salon_settings');
     if (savedSettings) {
       const parsedSettings = JSON.parse(savedSettings);
-      setSettings(parsedSettings);
-      if (parsedSettings.themePreset) {
-        applyTheme(parsedSettings.themePreset);
-      }
+      // Merge with defaults to ensure all new fields exist
+      const mergedSettings = { ...defaultSalonSettings, ...parsedSettings };
+      setSettings(mergedSettings);
+      applyTheme(mergedSettings.themePreset, mergedSettings.customColors, mergedSettings.priceColor);
     }
 
     const savedProfessionals = localStorage.getItem('salon_professionals');
     if (savedProfessionals) {
       setProfessionals(JSON.parse(savedProfessionals));
+    }
+
+    const savedServices = localStorage.getItem('salon_services');
+    if (savedServices) {
+      setServices(JSON.parse(savedServices));
     }
   }, []);
 
@@ -108,6 +130,10 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     localStorage.setItem('salon_professionals', JSON.stringify(professionals));
   }, [professionals]);
+
+  useEffect(() => {
+    localStorage.setItem('salon_services', JSON.stringify(services));
+  }, [services]);
 
   const generateTimeSlots = (start: string, end: string, intervalMinutes: number = 30): string[] => {
     const slots: string[] = [];
@@ -143,10 +169,34 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
     if (!professional) return [];
     
     const dayOfWeek = getDayOfWeekFromDateString(date);
+    
+    // Check if day is a working day for the salon
+    if (!settings.workingDays.includes(dayOfWeek)) return [];
+    
+    // Check if professional works on this day
     if (!professional.availableDays.includes(dayOfWeek)) return [];
     
-    const allSlots = generateTimeSlots(professional.availableHours.start, professional.availableHours.end);
+    // Get professional's hours but constrain to salon opening hours
+    const profStart = professional.availableHours.start;
+    const profEnd = professional.availableHours.end;
+    const salonStart = settings.openingHours.start;
+    const salonEnd = settings.openingHours.end;
+    
+    // Use the later start time and earlier end time
+    const effectiveStart = profStart > salonStart ? profStart : salonStart;
+    const effectiveEnd = profEnd < salonEnd ? profEnd : salonEnd;
+    
+    const allSlots = generateTimeSlots(effectiveStart, effectiveEnd);
     return allSlots;
+  };
+
+  const getProfessionalsForService = (serviceId: string): Professional[] => {
+    const service = services.find(s => s.id === serviceId);
+    if (!service) return [];
+    
+    return professionals.filter(p => 
+      p.services.includes(serviceId) || p.id === service.professionalId
+    );
   };
 
   const addAppointment = (appointment: Omit<Appointment, 'id' | 'createdAt'>) => {
@@ -211,7 +261,11 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateSettings = (newSettings: Partial<SalonSettings>) => {
-    setSettings(prev => ({ ...prev, ...newSettings }));
+    setSettings(prev => {
+      const updated = { ...prev, ...newSettings };
+      applyTheme(updated.themePreset, updated.customColors, updated.priceColor);
+      return updated;
+    });
   };
 
   const activateSubscription = () => {
@@ -220,7 +274,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
     setSubscription({
       isActive: true,
       plan: 'pro',
-      price: 87.30,
+      price: 45.30,
       expiresAt: expiresAt.toISOString(),
     });
   };
@@ -245,6 +299,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
       activateSubscription,
       getAvailableSlots,
       isSlotBooked,
+      getProfessionalsForService,
     }}>
       {children}
     </SalonContext.Provider>

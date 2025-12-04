@@ -4,10 +4,12 @@ import { Button } from '@/components/ui/button';
 import { ProfessionalCard } from '@/components/ProfessionalCard';
 import { useSalon } from '@/contexts/SalonContext';
 import { ServiceSelector } from '@/components/booking/ServiceSelector';
+import { ProfessionalSelector } from '@/components/booking/ProfessionalSelector';
 import { CalendarPicker } from '@/components/booking/CalendarPicker';
 import { TimeSlotPicker } from '@/components/booking/TimeSlotPicker';
 import { ClientForm } from '@/components/booking/ClientForm';
 import { BookingSuccess } from '@/components/booking/BookingSuccess';
+import { ClientHeader } from '@/components/layout/ClientHeader';
 import { Service, Professional } from '@/types/salon';
 import { cn } from '@/lib/utils';
 import { 
@@ -17,13 +19,14 @@ import {
   Star, 
   ChevronRight, 
   ArrowLeft,
-  Crown 
+  Instagram,
+  MessageCircle
 } from 'lucide-react';
 
-type BookingStep = 'landing' | 'service' | 'date' | 'time' | 'form' | 'success';
+type BookingStep = 'landing' | 'service' | 'professional' | 'date' | 'time' | 'form' | 'success';
 
 const Index = () => {
-  const { professionals, settings, addAppointment } = useSalon();
+  const { professionals, settings, addAppointment, getProfessionalsForService } = useSalon();
   const [step, setStep] = useState<BookingStep>('landing');
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedProfessional, setSelectedProfessional] = useState<Professional | null>(null);
@@ -31,11 +34,24 @@ const Index = () => {
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [clientName, setClientName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [availableProfessionals, setAvailableProfessionals] = useState<Professional[]>([]);
 
   const handleServiceSelect = (service: Service) => {
     setSelectedService(service);
-    const professional = professionals.find(p => p.id === service.professionalId);
-    setSelectedProfessional(professional || null);
+    const profs = getProfessionalsForService(service.id);
+    setAvailableProfessionals(profs);
+    
+    // If only one professional, auto-select and skip to date
+    if (profs.length === 1) {
+      setSelectedProfessional(profs[0]);
+      setStep('date');
+    } else {
+      setStep('professional');
+    }
+  };
+
+  const handleProfessionalSelect = (professional: Professional) => {
+    setSelectedProfessional(professional);
     setStep('date');
   };
 
@@ -78,6 +94,7 @@ const Index = () => {
     setSelectedDate(null);
     setSelectedTime(null);
     setClientName('');
+    setAvailableProfessionals([]);
     setStep('landing');
   };
 
@@ -86,9 +103,20 @@ const Index = () => {
       case 'service':
         setStep('landing');
         break;
-      case 'date':
+      case 'professional':
         setStep('service');
         setSelectedService(null);
+        setAvailableProfessionals([]);
+        break;
+      case 'date':
+        if (availableProfessionals.length > 1) {
+          setStep('professional');
+          setSelectedProfessional(null);
+        } else {
+          setStep('service');
+          setSelectedService(null);
+          setSelectedProfessional(null);
+        }
         break;
       case 'time':
         setStep('date');
@@ -115,9 +143,22 @@ const Index = () => {
                 <ArrowLeft className="w-5 h-5" />
               </Button>
             )}
-            <div className="flex-1">
-              <h1 className="font-display font-semibold text-foreground">{settings.name}</h1>
-              <p className="text-xs text-muted-foreground">Agendamento Online</p>
+            <div className="flex-1 flex items-center gap-3">
+              {settings.logoUrl && (
+                <img
+                  src={settings.logoUrl}
+                  alt={settings.name}
+                  className={cn(
+                    'h-8 object-contain',
+                    settings.logoFormat === 'circular' && 'rounded-full',
+                    settings.logoFormat === 'square' && 'rounded-lg'
+                  )}
+                />
+              )}
+              <div>
+                <h1 className="font-display font-semibold text-foreground">{settings.name}</h1>
+                <p className="text-xs text-muted-foreground">Agendamento Online</p>
+              </div>
             </div>
           </div>
         </header>
@@ -126,6 +167,13 @@ const Index = () => {
         <main className="container mx-auto px-4 py-8 max-w-2xl">
           {step === 'service' && (
             <ServiceSelector selectedService={selectedService} onSelect={handleServiceSelect} />
+          )}
+          {step === 'professional' && (
+            <ProfessionalSelector
+              professionals={availableProfessionals}
+              selectedProfessional={selectedProfessional}
+              onSelect={handleProfessionalSelect}
+            />
           )}
           {step === 'date' && selectedProfessional && (
             <CalendarPicker
@@ -163,39 +211,11 @@ const Index = () => {
   // Landing Page
   return (
     <div className="min-h-screen bg-background">
-      {/* Navigation */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {settings.logoUrl ? (
-              <img
-                src={settings.logoUrl}
-                alt={settings.name}
-                className={cn(
-                  'w-10 h-10 object-cover shadow-soft',
-                  settings.logoFormat === 'circular' && 'rounded-full',
-                  settings.logoFormat === 'square' && 'rounded-xl',
-                  settings.logoFormat === 'rectangular' && 'rounded-lg w-14 h-10'
-                )}
-              />
-            ) : (
-              <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center shadow-soft">
-                <Heart className="w-5 h-5 text-primary-foreground" />
-              </div>
-            )}
-            <span className="font-display font-semibold text-xl text-foreground">{settings.name}</span>
-          </div>
-          <Link to="/admin">
-            <Button variant="ghost" size="sm" className="gap-2">
-              <Crown className="w-4 h-4" />
-              Admin
-            </Button>
-          </Link>
-        </div>
-      </header>
+      {/* Header */}
+      <ClientHeader />
 
       {/* Hero Section */}
-      <section className="relative pt-32 pb-20 overflow-hidden">
+      <section className="relative pt-24 pb-20 overflow-hidden">
         {settings.bannerUrl ? (
           <div className="absolute inset-0">
             <img
@@ -222,12 +242,11 @@ const Index = () => {
             </div>
             
             <h1 className="text-4xl md:text-6xl font-display font-bold text-foreground mb-6 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
-              Agende seu momento de beleza no{' '}
-              <span className="text-gradient">Studio'Bella's Mulheres</span> 💖
+              {settings.welcomeText || `Agende seu momento de beleza no ${settings.name} 💖`}
             </h1>
             
             <p className="text-lg text-muted-foreground mb-8 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-              Transforme-se com nossos tratamentos exclusivos. Cabelo, unhas, cílios e muito mais.
+              {settings.description}
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
@@ -243,17 +262,45 @@ const Index = () => {
               </Button>
             </div>
 
+            {/* Social Links */}
+            {(settings.socialMedia?.instagram || settings.socialMedia?.whatsapp) && (
+              <div className="flex items-center justify-center gap-4 mt-8 animate-fade-in-up" style={{ animationDelay: '0.35s' }}>
+                {settings.socialMedia?.instagram && (
+                  <a
+                    href={`https://instagram.com/${settings.socialMedia.instagram.replace('@', '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <Instagram className="w-4 h-4" />
+                    @{settings.socialMedia.instagram.replace('@', '')}
+                  </a>
+                )}
+                {settings.socialMedia?.whatsapp && (
+                  <a
+                    href={`https://wa.me/${settings.socialMedia.whatsapp.replace(/\D/g, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    WhatsApp
+                  </a>
+                )}
+              </div>
+            )}
+
             {/* Trust badges */}
-            <div className="flex items-center justify-center gap-6 mt-12 animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
+            <div className="flex items-center justify-center gap-6 mt-8 animate-fade-in-up flex-wrap" style={{ animationDelay: '0.4s' }}>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Star className="w-4 h-4 text-accent fill-accent" />
                 <span>4.9 estrelas</span>
               </div>
-              <div className="w-1 h-1 rounded-full bg-border" />
+              <div className="w-1 h-1 rounded-full bg-border hidden sm:block" />
               <div className="text-sm text-muted-foreground">
                 +500 clientes satisfeitas
               </div>
-              <div className="w-1 h-1 rounded-full bg-border" />
+              <div className="w-1 h-1 rounded-full bg-border hidden sm:block" />
               <div className="text-sm text-muted-foreground">
                 Desde 2020
               </div>

@@ -38,7 +38,7 @@ export function SubscriptionGate({ children, fallbackMessage }: SubscriptionGate
             className="group"
           >
             <Sparkles className="w-5 h-5 mr-2 group-hover:animate-pulse" />
-            Assinar por R$ 87,30/mês
+            Assinar por R$ 45,30/mês
           </Button>
           <p className="text-xs text-muted-foreground mt-4">
             ✨ Profissionais ilimitadas • Agenda completa • Relatórios
