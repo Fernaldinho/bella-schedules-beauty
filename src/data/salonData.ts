@@ -88,6 +88,7 @@ export const sampleAppointments: Appointment[] = [
 export const defaultSalonSettings: SalonSettings = {
   name: "Studio'Bella's Mulheres",
   description: 'Seu momento de beleza e cuidado pessoal',
+  welcomeText: 'Agende seu momento de beleza no Studio\'Bella\'s Mulheres 💖',
   whatsapp: '11999999999',
   coverPhoto: '/placeholder.svg',
   bannerUrl: '',
@@ -95,6 +96,18 @@ export const defaultSalonSettings: SalonSettings = {
   logoFormat: 'circular',
   bannerFormat: 'rectangular',
   themePreset: 'purple',
+  customColors: {
+    primary: '280 60% 50%',
+    secondary: '320 70% 60%',
+    accent: '340 80% 65%',
+  },
+  priceColor: '142 76% 36%',
+  socialMedia: {
+    instagram: '',
+    whatsapp: '',
+    facebook: '',
+    tiktok: '',
+  },
   openingHours: { start: '08:00', end: '19:00' },
   workingDays: [1, 2, 3, 4, 5, 6],
 };

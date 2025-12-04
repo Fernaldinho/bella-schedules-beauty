@@ -39,11 +39,25 @@ export interface Client {
 }
 
 export type ImageFormat = 'square' | 'rectangular' | 'circular';
-export type ThemePreset = 'purple' | 'rose' | 'gold';
+export type ThemePreset = 'purple' | 'rose' | 'gold' | 'custom';
+
+export interface CustomColors {
+  primary: string;
+  secondary: string;
+  accent: string;
+}
+
+export interface SocialMedia {
+  instagram: string;
+  whatsapp: string;
+  facebook: string;
+  tiktok: string;
+}
 
 export interface SalonSettings {
   name: string;
   description: string;
+  welcomeText: string;
   whatsapp: string;
   coverPhoto: string;
   bannerUrl: string;
@@ -51,6 +65,9 @@ export interface SalonSettings {
   logoFormat: ImageFormat;
   bannerFormat: ImageFormat;
   themePreset: ThemePreset;
+  customColors: CustomColors;
+  priceColor: string;
+  socialMedia: SocialMedia;
   openingHours: { start: string; end: string };
   workingDays: number[];
 }

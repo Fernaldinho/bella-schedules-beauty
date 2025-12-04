@@ -7,17 +7,30 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/hooks/use-toast';
-import { Save, Store, Clock, Phone, Palette, Image } from 'lucide-react';
+import { Save, Store, Clock, Phone, Palette, Image, Share2, DollarSign, CalendarDays } from 'lucide-react';
 import { ImageUploader } from '@/components/admin/ImageUploader';
-import { ThemeSelector, getThemeCSS } from '@/components/admin/ThemeSelector';
-import { ImageFormat, ThemePreset } from '@/types/salon';
+import { ThemeSelector } from '@/components/admin/ThemeSelector';
+import { ColorPicker } from '@/components/admin/ColorPicker';
+import { ThemePreset, CustomColors, SocialMedia } from '@/types/salon';
+
+const WEEK_DAYS = [
+  { id: 0, name: 'Domingo' },
+  { id: 1, name: 'Segunda' },
+  { id: 2, name: 'Terça' },
+  { id: 3, name: 'Quarta' },
+  { id: 4, name: 'Quinta' },
+  { id: 5, name: 'Sexta' },
+  { id: 6, name: 'Sábado' },
+];
 
 export default function Settings() {
   const { settings, updateSettings } = useSalon();
   const [formData, setFormData] = useState({
     name: settings.name,
     description: settings.description,
+    welcomeText: settings.welcomeText || '',
     whatsapp: settings.whatsapp,
     openingStart: settings.openingHours.start,
     openingEnd: settings.openingHours.end,
@@ -26,12 +39,17 @@ export default function Settings() {
     logoFormat: settings.logoFormat,
     bannerFormat: settings.bannerFormat,
     themePreset: settings.themePreset,
+    customColors: settings.customColors || { primary: '280 60% 50%', secondary: '320 70% 60%', accent: '340 80% 65%' },
+    priceColor: settings.priceColor || '142 76% 36%',
+    socialMedia: settings.socialMedia || { instagram: '', whatsapp: '', facebook: '', tiktok: '' },
+    workingDays: settings.workingDays || [1, 2, 3, 4, 5, 6],
   });
 
   useEffect(() => {
     setFormData({
       name: settings.name,
       description: settings.description,
+      welcomeText: settings.welcomeText || '',
       whatsapp: settings.whatsapp,
       openingStart: settings.openingHours.start,
       openingEnd: settings.openingHours.end,
@@ -40,15 +58,34 @@ export default function Settings() {
       logoFormat: settings.logoFormat,
       bannerFormat: settings.bannerFormat,
       themePreset: settings.themePreset,
+      customColors: settings.customColors || { primary: '280 60% 50%', secondary: '320 70% 60%', accent: '340 80% 65%' },
+      priceColor: settings.priceColor || '142 76% 36%',
+      socialMedia: settings.socialMedia || { instagram: '', whatsapp: '', facebook: '', tiktok: '' },
+      workingDays: settings.workingDays || [1, 2, 3, 4, 5, 6],
     });
   }, [settings]);
 
   const handleThemeChange = (theme: ThemePreset) => {
     setFormData({ ...formData, themePreset: theme });
-    // Apply theme immediately
-    const themeCSS = getThemeCSS(theme);
-    Object.entries(themeCSS).forEach(([key, value]) => {
-      document.documentElement.style.setProperty(key, value);
+  };
+
+  const handleCustomColorsChange = (colors: CustomColors) => {
+    setFormData({ ...formData, customColors: colors });
+  };
+
+  const handleWorkingDayToggle = (dayId: number) => {
+    const current = formData.workingDays;
+    if (current.includes(dayId)) {
+      setFormData({ ...formData, workingDays: current.filter(d => d !== dayId) });
+    } else {
+      setFormData({ ...formData, workingDays: [...current, dayId].sort() });
+    }
+  };
+
+  const handleSocialMediaChange = (field: keyof SocialMedia, value: string) => {
+    setFormData({
+      ...formData,
+      socialMedia: { ...formData.socialMedia, [field]: value }
     });
   };
 
@@ -57,16 +94,18 @@ export default function Settings() {
     updateSettings({
       name: formData.name,
       description: formData.description,
+      welcomeText: formData.welcomeText,
       whatsapp: formData.whatsapp,
-      openingHours: {
-        start: formData.openingStart,
-        end: formData.openingEnd,
-      },
+      openingHours: { start: formData.openingStart, end: formData.openingEnd },
       bannerUrl: formData.bannerUrl,
       logoUrl: formData.logoUrl,
       logoFormat: formData.logoFormat,
       bannerFormat: formData.bannerFormat,
       themePreset: formData.themePreset,
+      customColors: formData.customColors,
+      priceColor: formData.priceColor,
+      socialMedia: formData.socialMedia,
+      workingDays: formData.workingDays,
     });
     toast({ title: 'Configurações salvas com sucesso!' });
   };
@@ -86,30 +125,20 @@ export default function Settings() {
                 <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center">
                   <Store className="w-5 h-5 text-primary-foreground" />
                 </div>
-                <h2 className="font-display font-semibold text-lg text-foreground">
-                  Informações do Salão
-                </h2>
+                <h2 className="font-display font-semibold text-lg text-foreground">Informações do Salão</h2>
               </div>
-
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Nome do Salão</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="input-elegant"
-                  />
+                  <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="input-elegant" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="description">Descrição</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="input-elegant resize-none"
-                    rows={3}
-                  />
+                  <Textarea id="description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="input-elegant resize-none" rows={2} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="welcomeText">Texto de Boas-vindas</Label>
+                  <Textarea id="welcomeText" value={formData.welcomeText} onChange={(e) => setFormData({ ...formData, welcomeText: e.target.value })} className="input-elegant resize-none" rows={2} placeholder="Agende seu momento de beleza 💖" />
                 </div>
               </div>
             </Card>
@@ -119,27 +148,11 @@ export default function Settings() {
                 <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center">
                   <Image className="w-5 h-5 text-primary-foreground" />
                 </div>
-                <h2 className="font-display font-semibold text-lg text-foreground">
-                  Personalização Visual
-                </h2>
+                <h2 className="font-display font-semibold text-lg text-foreground">Personalização Visual</h2>
               </div>
-
               <div className="space-y-6">
-                <ImageUploader
-                  label="Banner do Salão"
-                  currentUrl={formData.bannerUrl}
-                  format={formData.bannerFormat}
-                  onUrlChange={(url) => setFormData({ ...formData, bannerUrl: url })}
-                  onFormatChange={(format) => setFormData({ ...formData, bannerFormat: format })}
-                />
-
-                <ImageUploader
-                  label="Logotipo"
-                  currentUrl={formData.logoUrl}
-                  format={formData.logoFormat}
-                  onUrlChange={(url) => setFormData({ ...formData, logoUrl: url })}
-                  onFormatChange={(format) => setFormData({ ...formData, logoFormat: format })}
-                />
+                <ImageUploader label="Logotipo" currentUrl={formData.logoUrl} format={formData.logoFormat} onUrlChange={(url) => setFormData({ ...formData, logoUrl: url })} onFormatChange={(format) => setFormData({ ...formData, logoFormat: format })} />
+                <ImageUploader label="Banner" currentUrl={formData.bannerUrl} format={formData.bannerFormat} onUrlChange={(url) => setFormData({ ...formData, bannerUrl: url })} onFormatChange={(format) => setFormData({ ...formData, bannerFormat: format })} />
               </div>
             </Card>
 
@@ -148,36 +161,48 @@ export default function Settings() {
                 <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center">
                   <Palette className="w-5 h-5 text-primary-foreground" />
                 </div>
-                <h2 className="font-display font-semibold text-lg text-foreground">
-                  Tema Visual
-                </h2>
+                <h2 className="font-display font-semibold text-lg text-foreground">Tema Visual</h2>
               </div>
-
-              <ThemeSelector
-                currentTheme={formData.themePreset}
-                onThemeChange={handleThemeChange}
-              />
+              <ThemeSelector currentTheme={formData.themePreset} customColors={formData.customColors} onThemeChange={handleThemeChange} onCustomColorsChange={handleCustomColorsChange} />
             </Card>
 
             <Card className="p-6 border-0 shadow-card">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center">
-                  <Phone className="w-5 h-5 text-primary-foreground" />
+                  <DollarSign className="w-5 h-5 text-primary-foreground" />
                 </div>
-                <h2 className="font-display font-semibold text-lg text-foreground">
-                  Contato
-                </h2>
+                <h2 className="font-display font-semibold text-lg text-foreground">Cor dos Preços</h2>
               </div>
+              <ColorPicker label="Cor para valores" value={formData.priceColor} onChange={(value) => setFormData({ ...formData, priceColor: value })} description="Aplicada nos preços exibidos." />
+            </Card>
 
-              <div className="space-y-2">
-                <Label htmlFor="whatsapp">WhatsApp (apenas números)</Label>
-                <Input
-                  id="whatsapp"
-                  value={formData.whatsapp}
-                  onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value.replace(/\D/g, '') })}
-                  placeholder="11999999999"
-                  className="input-elegant"
-                />
+            <Card className="p-6 border-0 shadow-card">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center">
+                  <Share2 className="w-5 h-5 text-primary-foreground" />
+                </div>
+                <h2 className="font-display font-semibold text-lg text-foreground">Redes Sociais</h2>
+              </div>
+              <div className="space-y-4">
+                <div className="space-y-2"><Label>Instagram</Label><Input value={formData.socialMedia.instagram} onChange={(e) => handleSocialMediaChange('instagram', e.target.value)} placeholder="@seusalao" className="input-elegant" /></div>
+                <div className="space-y-2"><Label>WhatsApp</Label><Input value={formData.socialMedia.whatsapp} onChange={(e) => handleSocialMediaChange('whatsapp', e.target.value.replace(/\D/g, ''))} placeholder="5511999999999" className="input-elegant" /></div>
+              </div>
+            </Card>
+
+            <Card className="p-6 border-0 shadow-card">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center">
+                  <CalendarDays className="w-5 h-5 text-primary-foreground" />
+                </div>
+                <h2 className="font-display font-semibold text-lg text-foreground">Dias de Funcionamento</h2>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {WEEK_DAYS.map((day) => (
+                  <label key={day.id} className="flex items-center gap-2 p-3 rounded-lg border border-border hover:bg-secondary/50 cursor-pointer">
+                    <Checkbox checked={formData.workingDays.includes(day.id)} onCheckedChange={() => handleWorkingDayToggle(day.id)} />
+                    <span className="text-sm font-medium">{day.name}</span>
+                  </label>
+                ))}
               </div>
             </Card>
 
@@ -186,39 +211,15 @@ export default function Settings() {
                 <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center">
                   <Clock className="w-5 h-5 text-primary-foreground" />
                 </div>
-                <h2 className="font-display font-semibold text-lg text-foreground">
-                  Horário de Funcionamento
-                </h2>
+                <h2 className="font-display font-semibold text-lg text-foreground">Horário de Funcionamento</h2>
               </div>
-
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="openingStart">Abertura</Label>
-                  <Input
-                    id="openingStart"
-                    type="time"
-                    value={formData.openingStart}
-                    onChange={(e) => setFormData({ ...formData, openingStart: e.target.value })}
-                    className="input-elegant"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="openingEnd">Fechamento</Label>
-                  <Input
-                    id="openingEnd"
-                    type="time"
-                    value={formData.openingEnd}
-                    onChange={(e) => setFormData({ ...formData, openingEnd: e.target.value })}
-                    className="input-elegant"
-                  />
-                </div>
+                <div className="space-y-2"><Label>Abertura</Label><Input type="time" value={formData.openingStart} onChange={(e) => setFormData({ ...formData, openingStart: e.target.value })} className="input-elegant" /></div>
+                <div className="space-y-2"><Label>Fechamento</Label><Input type="time" value={formData.openingEnd} onChange={(e) => setFormData({ ...formData, openingEnd: e.target.value })} className="input-elegant" /></div>
               </div>
             </Card>
 
-            <Button type="submit" variant="gradient" size="lg" className="gap-2">
-              <Save className="w-4 h-4" />
-              Salvar Configurações
-            </Button>
+            <Button type="submit" variant="gradient" size="lg" className="gap-2"><Save className="w-4 h-4" />Salvar Configurações</Button>
           </form>
         </SubscriptionGate>
       </div>

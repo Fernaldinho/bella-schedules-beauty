@@ -12,7 +12,7 @@ interface CalendarPickerProps {
 }
 
 export function CalendarPicker({ professionalId, selectedDate, onSelect }: CalendarPickerProps) {
-  const { professionals } = useSalon();
+  const { professionals, settings } = useSalon();
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const professional = professionals.find(p => p.id === professionalId);
@@ -38,7 +38,13 @@ export function CalendarPicker({ professionalId, selectedDate, onSelect }: Calen
     if (date < today) return false;
     if (!professional) return false;
 
-    return professional.availableDays.includes(date.getDay());
+    const dayOfWeek = date.getDay();
+    
+    // Check if salon is open on this day
+    if (!settings.workingDays.includes(dayOfWeek)) return false;
+    
+    // Check if professional works on this day
+    return professional.availableDays.includes(dayOfWeek);
   };
 
   const formatDateString = (day: number) => {
