@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,7 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Professional, Service } from '@/types/salon';
 import { useSalon } from '@/contexts/SalonContext';
 import { toast } from '@/hooks/use-toast';
-import { Save, X } from 'lucide-react';
+import { Save, X, Upload } from 'lucide-react';
 
 interface ProfessionalFormProps {
   open: boolean;
@@ -28,6 +28,7 @@ const weekDays = [
 export function ProfessionalForm({ open, onOpenChange, professional }: ProfessionalFormProps) {
   const { services, addProfessional, updateProfessional } = useSalon();
   const isEditing = !!professional;
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -48,7 +49,7 @@ export function ProfessionalForm({ open, onOpenChange, professional }: Professio
         availableDays: professional.availableDays,
         availableHoursStart: professional.availableHours.start,
         availableHoursEnd: professional.availableHours.end,
-        selectedServices: professional.services,
+        selectedServices: professional.services || [],
       });
     } else {
       setFormData({
@@ -81,6 +82,25 @@ export function ProfessionalForm({ open, onOpenChange, professional }: Professio
     }));
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        setFormData(prev => ({ ...prev, photo: result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemovePhoto = () => {
+    setFormData(prev => ({ ...prev, photo: '/placeholder.svg' }));
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -111,11 +131,6 @@ export function ProfessionalForm({ open, onOpenChange, professional }: Professio
 
     onOpenChange(false);
   };
-
-  // Get unique services not assigned to other professionals (or assigned to current professional)
-  const availableServices = services.filter(
-    s => !professional || s.professionalId === professional.id || s.professionalId === ''
-  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -151,14 +166,56 @@ export function ProfessionalForm({ open, onOpenChange, professional }: Professio
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="photo">URL da Foto</Label>
-              <Input
-                id="photo"
-                value={formData.photo}
-                onChange={(e) => setFormData({ ...formData, photo: e.target.value })}
-                placeholder="URL da imagem"
-                className="input-elegant"
-              />
+              <Label>Foto</Label>
+              <div className="flex items-start gap-4">
+                <div className="relative w-24 h-24 bg-muted border-2 border-dashed border-border rounded-full overflow-hidden flex items-center justify-center">
+                  {formData.photo && formData.photo !== '/placeholder.svg' ? (
+                    <>
+                      <img
+                        src={formData.photo}
+                        alt="Preview"
+                        className="w-full h-full object-cover rounded-full"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleRemovePhoto}
+                        className="absolute top-0 right-0 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center hover:bg-destructive/80"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </>
+                  ) : (
+                    <div className="text-center p-2">
+                      <Upload className="w-6 h-6 mx-auto text-muted-foreground mb-1" />
+                      <p className="text-xs text-muted-foreground">Sem foto</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex-1 space-y-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="hidden"
+                    id="professional-photo-upload"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full"
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Escolher Foto
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    JPG, PNG ou WEBP
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div className="space-y-2">

@@ -41,19 +41,19 @@ export function ClientHeader() {
                 src={settings.logoUrl}
                 alt={settings.name}
                 className={cn(
-                  "h-10 object-contain",
+                  "h-14 object-contain",
                   settings.logoFormat === 'circular' && "rounded-full",
                   settings.logoFormat === 'square' && "rounded-lg"
                 )}
               />
             ) : (
-              <div className="w-10 h-10 gradient-primary rounded-full flex items-center justify-center">
-                <span className="text-primary-foreground font-display font-bold text-lg">
+              <div className="w-14 h-14 gradient-primary rounded-full flex items-center justify-center">
+                <span className="text-primary-foreground font-display font-bold text-xl">
                   {settings.name.charAt(0)}
                 </span>
               </div>
             )}
-            <span className="font-display font-semibold text-foreground hidden sm:block">
+            <span className="font-display font-semibold text-lg text-foreground hidden sm:block">
               {settings.name}
             </span>
           </Link>

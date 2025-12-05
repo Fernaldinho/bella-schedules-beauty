@@ -54,22 +54,27 @@ export interface SocialMedia {
   tiktok: string;
 }
 
+export interface SalonStats {
+  rating: string;
+  clientCount: string;
+  since: string;
+}
+
 export interface SalonSettings {
   name: string;
   description: string;
   welcomeText: string;
   whatsapp: string;
   coverPhoto: string;
-  bannerUrl: string;
   logoUrl: string;
   logoFormat: ImageFormat;
-  bannerFormat: ImageFormat;
   themePreset: ThemePreset;
   customColors: CustomColors;
   priceColor: string;
   socialMedia: SocialMedia;
   openingHours: { start: string; end: string };
   workingDays: number[];
+  stats: SalonStats;
 }
 
 export interface Subscription {

@@ -9,16 +9,16 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_20px_-4px_hsl(280_60%_50%_/_0.15)] hover:shadow-[0_0_40px_hsl(340_80%_65%_/_0.3)] hover:scale-[1.02]",
+        default: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-soft hover:shadow-glow hover:scale-[1.02]",
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
-        gradient: "bg-gradient-to-r from-[hsl(280_60%_50%)] to-[hsl(340_80%_65%)] text-white shadow-[0_4px_20px_-4px_hsl(280_60%_50%_/_0.15)] hover:shadow-[0_0_40px_hsl(340_80%_65%_/_0.3)] hover:scale-[1.02]",
-        hero: "bg-gradient-to-r from-[hsl(280_60%_55%)] via-[hsl(320_70%_60%)] to-[hsl(340_80%_65%)] text-white shadow-[0_0_40px_hsl(340_80%_65%_/_0.3)] hover:scale-[1.03] font-semibold",
+        gradient: "gradient-primary text-white shadow-soft hover:shadow-glow hover:scale-[1.02]",
+        hero: "gradient-hero text-white shadow-glow hover:scale-[1.03] font-semibold",
         soft: "bg-primary/10 text-primary hover:bg-primary/20",
-        rose: "bg-accent text-accent-foreground hover:bg-accent/90 shadow-[0_4px_20px_-4px_hsl(280_60%_50%_/_0.15)] hover:shadow-[0_0_40px_hsl(340_80%_65%_/_0.3)]",
+        rose: "bg-accent text-accent-foreground hover:bg-accent/90 shadow-soft hover:shadow-glow",
       },
       size: {
         default: "h-10 px-4 py-2",
