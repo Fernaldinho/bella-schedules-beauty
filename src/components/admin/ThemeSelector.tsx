@@ -106,30 +106,39 @@ export function ThemeSelector({ currentTheme, customColors, onThemeChange, onCus
               label="Cor Principal"
               value={customColors.primary}
               onChange={(value) => onCustomColorsChange({ ...customColors, primary: value })}
-              description="Botões, títulos e destaques"
+              description="Botões, títulos e destaques (cor sólida)"
             />
             <ColorPicker
-              label="Cor Secundária"
+              label="Cor do Degradê 1"
               value={customColors.secondary}
               onChange={(value) => onCustomColorsChange({ ...customColors, secondary: value })}
-              description="Meio do degradê"
+              description="Início do degradê"
             />
             <ColorPicker
-              label="Cor de Destaque"
+              label="Cor do Degradê 2"
               value={customColors.accent}
               onChange={(value) => onCustomColorsChange({ ...customColors, accent: value })}
-              description="Acentos e efeitos"
+              description="Fim do degradê"
             />
             
             {/* Preview */}
-            <div className="pt-4">
-              <p className="text-xs text-muted-foreground mb-2">Pré-visualização:</p>
-              <div
-                className="h-12 rounded-lg"
-                style={{
-                  background: `linear-gradient(135deg, hsl(${customColors.primary}) 0%, hsl(${customColors.secondary}) 50%, hsl(${customColors.accent}) 100%)`
-                }}
-              />
+            <div className="pt-4 space-y-3">
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Cor Principal (botões):</p>
+                <div
+                  className="h-10 rounded-lg"
+                  style={{ backgroundColor: `hsl(${customColors.primary})` }}
+                />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Degradê (fundos e efeitos):</p>
+                <div
+                  className="h-10 rounded-lg"
+                  style={{
+                    background: `linear-gradient(135deg, hsl(${customColors.secondary}) 0%, hsl(${customColors.accent}) 100%)`
+                  }}
+                />
+              </div>
             </div>
           </div>
         )}
@@ -139,35 +148,37 @@ export function ThemeSelector({ currentTheme, customColors, onThemeChange, onCus
 }
 
 export function getThemeCSS(theme: ThemePreset, customColors?: CustomColors): Record<string, string> {
+  // Primary = solid color for buttons/titles/highlights
+  // Gradient = secondary to accent (2 colors only)
   const themes = {
     purple: {
       '--primary': '270 70% 50%',
       '--primary-foreground': '0 0% 100%',
       '--accent': '330 80% 60%',
-      '--gradient-primary': 'linear-gradient(135deg, hsl(270, 70%, 50%), hsl(330, 80%, 60%))',
+      '--gradient-primary': 'linear-gradient(135deg, hsl(280, 60%, 55%), hsl(330, 80%, 60%))',
     },
     rose: {
       '--primary': '350 80% 55%',
       '--primary-foreground': '0 0% 100%',
       '--accent': '350 70% 70%',
-      '--gradient-primary': 'linear-gradient(135deg, hsl(350, 80%, 55%), hsl(350, 70%, 70%))',
+      '--gradient-primary': 'linear-gradient(135deg, hsl(340, 75%, 60%), hsl(350, 70%, 70%))',
     },
     gold: {
       '--primary': '45 90% 40%',
       '--primary-foreground': '0 0% 100%',
       '--accent': '45 90% 55%',
-      '--gradient-primary': 'linear-gradient(135deg, hsl(45, 90%, 40%), hsl(45, 90%, 55%))',
+      '--gradient-primary': 'linear-gradient(135deg, hsl(40, 85%, 50%), hsl(50, 90%, 60%))',
     },
     custom: customColors ? {
       '--primary': customColors.primary,
       '--primary-foreground': '0 0% 100%',
       '--accent': customColors.accent,
-      '--gradient-primary': `linear-gradient(135deg, hsl(${customColors.primary}), hsl(${customColors.secondary}), hsl(${customColors.accent}))`,
+      '--gradient-primary': `linear-gradient(135deg, hsl(${customColors.secondary}), hsl(${customColors.accent}))`,
     } : {
       '--primary': '280 60% 50%',
       '--primary-foreground': '0 0% 100%',
       '--accent': '340 80% 65%',
-      '--gradient-primary': 'linear-gradient(135deg, hsl(280, 60%, 50%), hsl(340, 80%, 65%))',
+      '--gradient-primary': 'linear-gradient(135deg, hsl(280, 60%, 55%), hsl(340, 80%, 65%))',
     },
   };
   return themes[theme];
