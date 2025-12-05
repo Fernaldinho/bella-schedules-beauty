@@ -70,7 +70,10 @@ export default function Professionals() {
         <SubscriptionGate fallbackMessage="Assine o plano PRO para gerenciar suas profissionais.">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {professionals.map((professional, index) => {
-              const professionalServices = services.filter(s => s.professionalId === professional.id);
+              // Get services from both professional.services array AND services where professionalId matches
+              const professionalServices = services.filter(s => 
+                professional.services?.includes(s.id) || s.professionalId === professional.id
+              );
 
               return (
                 <Card 

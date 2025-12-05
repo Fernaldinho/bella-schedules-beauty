@@ -216,21 +216,7 @@ const Index = () => {
 
       {/* Hero Section */}
       <section className="relative pt-24 pb-20 overflow-hidden">
-        {settings.bannerUrl ? (
-          <div className="absolute inset-0">
-            <img
-              src={settings.bannerUrl}
-              alt="Banner"
-              className={cn(
-                'w-full h-full object-cover opacity-20',
-                settings.bannerFormat === 'circular' && 'rounded-full'
-              )}
-            />
-            <div className="absolute inset-0 gradient-soft" />
-          </div>
-        ) : (
-          <div className="absolute inset-0 gradient-soft" />
-        )}
+        <div className="absolute inset-0 gradient-soft" />
         <div className="absolute top-20 left-10 w-64 h-64 bg-primary/10 rounded-full blur-3xl animate-float" />
         <div className="absolute bottom-10 right-10 w-96 h-96 bg-accent/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '1s' }} />
         
@@ -294,15 +280,15 @@ const Index = () => {
             <div className="flex items-center justify-center gap-6 mt-8 animate-fade-in-up flex-wrap" style={{ animationDelay: '0.4s' }}>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Star className="w-4 h-4 text-accent fill-accent" />
-                <span>4.9 estrelas</span>
+                <span>{settings.stats?.rating || '4.9'} estrelas</span>
               </div>
               <div className="w-1 h-1 rounded-full bg-border hidden sm:block" />
               <div className="text-sm text-muted-foreground">
-                +500 clientes satisfeitas
+                {settings.stats?.clientCount || '+500'} clientes satisfeitas
               </div>
               <div className="w-1 h-1 rounded-full bg-border hidden sm:block" />
               <div className="text-sm text-muted-foreground">
-                Desde 2020
+                Desde {settings.stats?.since || '2020'}
               </div>
             </div>
           </div>
