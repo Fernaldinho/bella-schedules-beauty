@@ -48,11 +48,34 @@ serve(async (req) => {
       customerId = customer.id;
     }
 
-    // Create checkout session with the specific price ID
-    const priceId = "price_1SbFDcP29UxAYo1Io8zi8kAf";
-    
+    // Create checkout session - create price on the fly for testing
     const { origin } = new URL(req.url);
     const baseUrl = req.headers.get("origin") || origin;
+
+    // Try to use the configured price, if it doesn't exist, create one dynamically
+    let priceId = "price_1SbFDcP29UxAYo1Io8zi8kAf";
+    
+    try {
+      await stripe.prices.retrieve(priceId);
+    } catch {
+      // Price doesn't exist, create a product and price dynamically
+      console.log("Price not found, creating dynamic product and price...");
+      
+      const product = await stripe.products.create({
+        name: "Plano PRO - Agendamento",
+        description: "Acesso completo ao sistema de agendamento",
+      });
+      
+      const price = await stripe.prices.create({
+        product: product.id,
+        unit_amount: 4530, // R$ 45,30 in cents
+        currency: "brl",
+        recurring: { interval: "month" },
+      });
+      
+      priceId = price.id;
+      console.log("Created dynamic price:", priceId);
+    }
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
