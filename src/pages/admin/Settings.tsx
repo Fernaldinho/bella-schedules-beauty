@@ -9,10 +9,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/hooks/use-toast';
-import { Save, Store, Clock, Palette, Image, Share2, DollarSign, CalendarDays, Star, Users, Calendar } from 'lucide-react';
+import { Save, Store, Clock, Palette, Image, Share2, DollarSign, CalendarDays, Star, Globe } from 'lucide-react';
 import { ImageUploader } from '@/components/admin/ImageUploader';
 import { ThemeSelector } from '@/components/admin/ThemeSelector';
 import { ColorPicker } from '@/components/admin/ColorPicker';
+import { ClientPageLinks } from '@/components/admin/ClientPageLinks';
 import { ThemePreset, CustomColors, SocialMedia, SalonStats } from '@/types/salon';
 
 const WEEK_DAYS = [
@@ -117,9 +118,20 @@ export default function Settings() {
   return (
     <AdminLayout>
       <div className="space-y-8">
-        <div>
-          <h1 className="text-3xl font-display font-semibold text-foreground">Configurações</h1>
-          <p className="text-muted-foreground mt-1">Configure as informações do salão</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-display font-semibold text-foreground">Configurações</h1>
+            <p className="text-muted-foreground mt-1">Configure as informações do salão</p>
+          </div>
+          <Card className="p-4 border-0 shadow-card">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-8 h-8 gradient-primary rounded-lg flex items-center justify-center">
+                <Globe className="w-4 h-4 text-primary-foreground" />
+              </div>
+              <span className="font-medium text-foreground">Página do Cliente</span>
+            </div>
+            <ClientPageLinks />
+          </Card>
         </div>
 
         <SubscriptionGate fallbackMessage="Assine o plano PRO para acessar as configurações.">
