@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Professional, Service, Appointment, SalonSettings, Subscription, Client, ThemePreset, CustomColors } from '@/types/salon';
+import { Professional, Service, Appointment, SalonSettings, Client, ThemePreset, CustomColors } from '@/types/salon';
 import { professionals as defaultProfessionals, services as defaultServices, sampleAppointments, defaultSalonSettings } from '@/data/salonData';
 import { getDayOfWeekFromDateString } from '@/lib/dateUtils';
 
@@ -9,7 +9,6 @@ interface SalonContextType {
   appointments: Appointment[];
   clients: Client[];
   settings: SalonSettings;
-  subscription: Subscription;
   
   // Actions
   addAppointment: (appointment: Omit<Appointment, 'id' | 'createdAt'>) => void;
@@ -21,7 +20,6 @@ interface SalonContextType {
   updateProfessional: (id: string, professional: Partial<Professional>) => void;
   deleteProfessional: (id: string) => void;
   updateSettings: (settings: Partial<SalonSettings>) => void;
-  activateSubscription: () => void;
   getAvailableSlots: (professionalId: string, date: string) => string[];
   isSlotBooked: (professionalId: string, date: string, time: string) => boolean;
   getProfessionalsForService: (serviceId: string) => Professional[];
@@ -35,12 +33,6 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   const [appointments, setAppointments] = useState<Appointment[]>(sampleAppointments);
   const [clients, setClients] = useState<Client[]>([]);
   const [settings, setSettings] = useState<SalonSettings>(defaultSalonSettings);
-  const [subscription, setSubscription] = useState<Subscription>({
-    isActive: false,
-    plan: null,
-    price: 45.30,
-    expiresAt: null,
-  });
 
   const applyTheme = (themePreset: ThemePreset, customColors?: CustomColors, priceColor?: string) => {
     const presetThemes = {
@@ -84,11 +76,6 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
 
   // Load from localStorage
   useEffect(() => {
-    const savedSubscription = localStorage.getItem('salon_subscription');
-    if (savedSubscription) {
-      setSubscription(JSON.parse(savedSubscription));
-    }
-    
     const savedAppointments = localStorage.getItem('salon_appointments');
     if (savedAppointments) {
       setAppointments(JSON.parse(savedAppointments));
@@ -113,11 +100,6 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
       setServices(JSON.parse(savedServices));
     }
   }, []);
-
-  // Save to localStorage
-  useEffect(() => {
-    localStorage.setItem('salon_subscription', JSON.stringify(subscription));
-  }, [subscription]);
 
   useEffect(() => {
     localStorage.setItem('salon_appointments', JSON.stringify(appointments));
@@ -268,16 +250,6 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const activateSubscription = () => {
-    const expiresAt = new Date();
-    expiresAt.setMonth(expiresAt.getMonth() + 1);
-    setSubscription({
-      isActive: true,
-      plan: 'pro',
-      price: 45.30,
-      expiresAt: expiresAt.toISOString(),
-    });
-  };
 
   return (
     <SalonContext.Provider value={{
@@ -286,7 +258,6 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
       appointments,
       clients,
       settings,
-      subscription,
       addAppointment,
       cancelAppointment,
       addService,
@@ -296,7 +267,6 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
       updateProfessional,
       deleteProfessional,
       updateSettings,
-      activateSubscription,
       getAvailableSlots,
       isSlotBooked,
       getProfessionalsForService,

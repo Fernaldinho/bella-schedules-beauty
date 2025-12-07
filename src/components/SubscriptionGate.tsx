@@ -1,7 +1,8 @@
-import { ReactNode } from 'react';
-import { useSalon } from '@/contexts/SalonContext';
+import { ReactNode, useState } from 'react';
+import { useSubscription } from '@/hooks/useSubscription';
 import { Button } from '@/components/ui/button';
-import { Lock, Sparkles } from 'lucide-react';
+import { Lock, Sparkles, Loader2 } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 
 interface SubscriptionGateProps {
   children: ReactNode;
@@ -9,9 +10,33 @@ interface SubscriptionGateProps {
 }
 
 export function SubscriptionGate({ children, fallbackMessage }: SubscriptionGateProps) {
-  const { subscription, activateSubscription } = useSalon();
+  const { isActive, isLoading, createCheckout } = useSubscription();
+  const [isCreatingCheckout, setIsCreatingCheckout] = useState(false);
 
-  if (subscription.isActive) {
+  const handleSubscribe = async () => {
+    setIsCreatingCheckout(true);
+    try {
+      await createCheckout();
+    } catch (error) {
+      toast({ 
+        title: 'Erro ao iniciar pagamento', 
+        description: 'Tente novamente em alguns instantes.',
+        variant: 'destructive' 
+      });
+    } finally {
+      setIsCreatingCheckout(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (isActive) {
     return <>{children}</>;
   }
 
@@ -34,10 +59,15 @@ export function SubscriptionGate({ children, fallbackMessage }: SubscriptionGate
           <Button 
             variant="hero" 
             size="xl" 
-            onClick={activateSubscription}
+            onClick={handleSubscribe}
+            disabled={isCreatingCheckout}
             className="group"
           >
-            <Sparkles className="w-5 h-5 mr-2 group-hover:animate-pulse" />
+            {isCreatingCheckout ? (
+              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+            ) : (
+              <Sparkles className="w-5 h-5 mr-2 group-hover:animate-pulse" />
+            )}
             Assinar por R$ 45,30/mês
           </Button>
           <p className="text-xs text-muted-foreground mt-4">

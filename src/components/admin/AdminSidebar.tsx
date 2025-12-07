@@ -8,12 +8,13 @@ import {
   Settings,
   Crown,
   ChevronLeft,
-  Menu
+  Menu,
+  X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSalon } from '@/contexts/SalonContext';
+import { useSubscription } from '@/hooks/useSubscription';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
 
 const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/admin' },
@@ -25,19 +26,33 @@ const menuItems = [
   { icon: Settings, label: 'Configurações', path: '/admin/settings' },
 ];
 
-export function AdminSidebar() {
+interface AdminSidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
   const location = useLocation();
-  const { subscription, settings } = useSalon();
-  const [collapsed, setCollapsed] = useState(false);
+  const { settings } = useSalon();
+  const { isActive: isSubscribed } = useSubscription();
 
   return (
-    <aside className={cn(
-      "h-screen bg-card border-r border-border flex flex-col transition-all duration-300",
-      collapsed ? "w-16" : "w-64"
-    )}>
-      {/* Header */}
-      <div className="p-4 border-b border-border flex items-center justify-between">
-        {!collapsed && (
+    <>
+      {/* Mobile Overlay */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 lg:hidden"
+          onClick={onClose}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside className={cn(
+        "fixed lg:static inset-y-0 left-0 z-50 h-screen bg-card border-r border-border flex flex-col transition-transform duration-300 w-64",
+        isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+      )}>
+        {/* Header */}
+        <div className="p-4 border-b border-border flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 gradient-primary rounded-lg flex items-center justify-center">
               <Crown className="w-4 h-4 text-primary-foreground" />
@@ -49,27 +64,25 @@ export function AdminSidebar() {
               <p className="text-xs text-muted-foreground">Admin</p>
             </div>
           </div>
-        )}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setCollapsed(!collapsed)}
-          className="shrink-0"
-        >
-          {collapsed ? <Menu className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-        </Button>
-      </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="lg:hidden"
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
 
-      {/* Subscription Badge */}
-      {!collapsed && (
+        {/* Subscription Badge */}
         <div className="p-4">
           <div className={cn(
             "rounded-xl p-3 text-center text-sm",
-            subscription.isActive 
+            isSubscribed 
               ? "gradient-primary text-primary-foreground" 
               : "bg-muted text-muted-foreground"
           )}>
-            {subscription.isActive ? (
+            {isSubscribed ? (
               <div className="flex items-center justify-center gap-2">
                 <Crown className="w-4 h-4" />
                 <span className="font-medium">Plano PRO Ativo</span>
@@ -79,46 +92,57 @@ export function AdminSidebar() {
             )}
           </div>
         </div>
-      )}
 
-      {/* Navigation */}
-      <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
-        {menuItems.map((item) => {
-          const isActive = location.pathname === item.path;
-          const Icon = item.icon;
+        {/* Navigation */}
+        <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
+          {menuItems.map((item) => {
+            const isActive = location.pathname === item.path;
+            const Icon = item.icon;
 
-          return (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200",
-                isActive 
-                  ? "gradient-primary text-primary-foreground shadow-soft" 
-                  : "text-muted-foreground hover:bg-secondary hover:text-foreground",
-                collapsed && "justify-center"
-              )}
-            >
-              <Icon className="w-5 h-5 shrink-0" />
-              {!collapsed && <span className="font-medium">{item.label}</span>}
-            </Link>
-          );
-        })}
-      </nav>
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                onClick={onClose}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200",
+                  isActive 
+                    ? "gradient-primary text-primary-foreground shadow-soft" 
+                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                )}
+              >
+                <Icon className="w-5 h-5 shrink-0" />
+                <span className="font-medium">{item.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
 
-      {/* Footer */}
-      <div className="p-4 border-t border-border">
-        <Link
-          to="/"
-          className={cn(
-            "flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors",
-            collapsed && "justify-center"
-          )}
-        >
-          <ChevronLeft className="w-4 h-4" />
-          {!collapsed && <span>Voltar ao Site</span>}
-        </Link>
-      </div>
-    </aside>
+        {/* Footer */}
+        <div className="p-4 border-t border-border">
+          <Link
+            to="/"
+            onClick={onClose}
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            <span>Voltar ao Site</span>
+          </Link>
+        </div>
+      </aside>
+    </>
+  );
+}
+
+export function SidebarTrigger({ onClick }: { onClick: () => void }) {
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={onClick}
+      className="lg:hidden"
+    >
+      <Menu className="w-5 h-5" />
+    </Button>
   );
 }

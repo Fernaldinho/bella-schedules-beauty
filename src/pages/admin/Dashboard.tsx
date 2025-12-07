@@ -2,6 +2,7 @@ import { AdminLayout } from '@/components/admin/AdminLayout';
 import { SubscriptionGate } from '@/components/SubscriptionGate';
 import { useSalon } from '@/contexts/SalonContext';
 import { Card } from '@/components/ui/card';
+import { ClientPageLinks } from '@/components/admin/ClientPageLinks';
 import { 
   Calendar, 
   Users, 
@@ -9,7 +10,8 @@ import {
   TrendingUp,
   Clock,
   CheckCircle,
-  XCircle
+  XCircle,
+  Globe
 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -64,9 +66,20 @@ export default function Dashboard() {
   return (
     <AdminLayout>
       <div className="space-y-8">
-        <div>
-          <h1 className="text-3xl font-display font-semibold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Visão geral do seu salão</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-display font-semibold text-foreground">Dashboard</h1>
+            <p className="text-muted-foreground mt-1">Visão geral do seu salão</p>
+          </div>
+          <Card className="p-4 border-0 shadow-card">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-8 h-8 gradient-primary rounded-lg flex items-center justify-center">
+                <Globe className="w-4 h-4 text-primary-foreground" />
+              </div>
+              <span className="font-medium text-foreground">Página do Cliente</span>
+            </div>
+            <ClientPageLinks />
+          </Card>
         </div>
 
         <SubscriptionGate fallbackMessage="Assine o plano PRO para ver estatísticas completas do seu salão.">
