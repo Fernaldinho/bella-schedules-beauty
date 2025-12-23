@@ -48,8 +48,8 @@ serve(async (req) => {
       customerId = customer.id;
     }
 
-    // Use the configured price ID
-    const priceId = "price_1SbFDcP29UxAYo1Io8zi8kAf";
+    // Product ID: prod_SPYf7JbeLmDuDQ (Modo Teste)
+    const priceId = "price_1RV26mP29UxAYo1I51TbUcjW";
     
     const baseUrl = req.headers.get("origin") || "https://lovable.dev";
 
