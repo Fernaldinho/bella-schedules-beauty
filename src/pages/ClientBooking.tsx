@@ -149,27 +149,64 @@ export default function ClientBooking() {
   }, [selectedProfessional, selectedDate, salon]);
 
   const applyTheme = (salonData: SalonData) => {
-    const colors = salonData.custom_colors || { primary: '270 70% 50%', secondary: '320 70% 60%', accent: '330 80% 60%' };
+    // Buscar cores do tema preset ou personalizadas
+    const colors = getThemeColors(salonData);
     
-    console.log('[THEME] Aplicando cores personalizadas:', colors);
+    console.log('[THEME] Aplicando tema:', {
+      preset: salonData.theme_preset,
+      colors,
+      priceColor: salonData.price_color,
+      serviceColor: salonData.service_color
+    });
     
-    // Aplicar cores CSS
-    document.documentElement.style.setProperty('--primary', colors.primary);
-    document.documentElement.style.setProperty('--accent', colors.accent);
-    document.documentElement.style.setProperty('--secondary', colors.secondary);
+    // Aplicar cores CSS diretamente no :root
+    const root = document.documentElement;
     
-    // Gradientes dinâmicos
-    const gradient = `linear-gradient(135deg, hsl(${colors.primary}) 0%, hsl(${colors.secondary}) 50%, hsl(${colors.accent}) 100%)`;
-    document.documentElement.style.setProperty('--gradient-primary', gradient);
-    document.documentElement.style.setProperty('--gradient-hero', gradient);
+    root.style.setProperty('--primary', colors.primary);
+    root.style.setProperty('--primary-foreground', '0 0% 100%');
+    root.style.setProperty('--accent', colors.accent);
+    root.style.setProperty('--secondary', colors.secondary);
+    
+    // Gradientes dinâmicos (sempre 2 cores: secondary -> accent)
+    const gradient = `linear-gradient(135deg, hsl(${colors.secondary}) 0%, hsl(${colors.accent}) 100%)`;
+    root.style.setProperty('--gradient-primary', gradient);
+    root.style.setProperty('--gradient-hero', gradient);
     
     // Cores de preço e serviço (se configuradas)
     if (salonData.price_color) {
-      document.documentElement.style.setProperty('--price-color', salonData.price_color);
+      root.style.setProperty('--price-color', salonData.price_color);
     }
     if (salonData.service_color) {
-      document.documentElement.style.setProperty('--service-color', salonData.service_color);
+      root.style.setProperty('--service-color', salonData.service_color);
     }
+    
+    // Marcar que o tema foi aplicado (previne flash)
+    root.setAttribute('data-theme-loaded', 'true');
+  };
+
+  // Função para obter cores baseadas no preset ou customização
+  const getThemeColors = (salonData: SalonData) => {
+    const preset = salonData.theme_preset || 'purple';
+    const customColors = salonData.custom_colors;
+    
+    // Presets fixos
+    const presets: Record<string, { primary: string; secondary: string; accent: string }> = {
+      purple: { primary: '270 70% 50%', secondary: '280 60% 55%', accent: '330 80% 60%' },
+      rose: { primary: '350 80% 55%', secondary: '340 75% 60%', accent: '350 70% 70%' },
+      gold: { primary: '45 90% 40%', secondary: '40 85% 50%', accent: '50 90% 60%' },
+    };
+    
+    // Se for custom e tiver cores definidas, usar elas
+    if (preset === 'custom' && customColors) {
+      return {
+        primary: customColors.primary || '270 70% 50%',
+        secondary: customColors.secondary || '320 70% 60%',
+        accent: customColors.accent || '330 80% 60%',
+      };
+    }
+    
+    // Caso contrário, usar preset (ou purple como fallback)
+    return presets[preset] || presets.purple;
   };
 
   const loadSalonData = async () => {
@@ -363,10 +400,14 @@ export default function ClientBooking() {
     setClientPhone('');
   };
 
+  // Loading: não renderiza nada visual até ter os dados (evita flash de cores default)
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Carregando...</p>
+        </div>
       </div>
     );
   }
