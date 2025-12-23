@@ -1,8 +1,12 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { 
@@ -12,14 +16,23 @@ import {
   Loader2,
   User,
   TrendingUp,
-  Scissors
+  Scissors,
+  Settings,
+  Link,
+  Check,
+  Upload,
+  X,
+  Save,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, startOfDay, endOfDay, parseISO } from 'date-fns';
+import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface SalonData {
   id: string;
   name: string;
+  slug: string | null;
   logo_url: string | null;
   logo_format: string | null;
   theme_preset: string | null;
@@ -31,6 +44,16 @@ interface Professional {
   name: string;
   specialty: string | null;
   photo: string | null;
+  available_days: number[];
+  available_hours: { start: string; end: string };
+  salon_id: string;
+}
+
+interface Service {
+  id: string;
+  name: string;
+  price: number;
+  duration: number;
 }
 
 interface Appointment {
@@ -39,12 +62,7 @@ interface Appointment {
   time: string;
   status: string;
   client_name: string;
-  service: {
-    id: string;
-    name: string;
-    price: number;
-    duration: number;
-  } | null;
+  service: Service | null;
 }
 
 interface ServiceStats {
@@ -53,13 +71,39 @@ interface ServiceStats {
   revenue: number;
 }
 
+const weekDays = [
+  { value: 0, label: 'Dom' },
+  { value: 1, label: 'Seg' },
+  { value: 2, label: 'Ter' },
+  { value: 3, label: 'Qua' },
+  { value: 4, label: 'Qui' },
+  { value: 5, label: 'Sex' },
+  { value: 6, label: 'Sáb' },
+];
+
 export default function ProfessionalDashboard() {
   const { professionalId } = useParams();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [salon, setSalon] = useState<SalonData | null>(null);
   const [professional, setProfessional] = useState<Professional | null>(null);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [allServices, setAllServices] = useState<Service[]>([]);
+  const [professionalServices, setProfessionalServices] = useState<string[]>([]);
   const [period, setPeriod] = useState<'today' | 'month'>('month');
+  
+  // Settings state
+  const [showSettings, setShowSettings] = useState(false);
+  const [editPhoto, setEditPhoto] = useState('');
+  const [editDays, setEditDays] = useState<number[]>([]);
+  const [editHoursStart, setEditHoursStart] = useState('09:00');
+  const [editHoursEnd, setEditHoursEnd] = useState('18:00');
+  const [editServices, setEditServices] = useState<string[]>([]);
+  
+  // Link copy state
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (professionalId) {
@@ -115,7 +159,7 @@ export default function ProfessionalDashboard() {
       // Load professional
       const { data: prof, error: profError } = await supabase
         .from('professionals')
-        .select('id, name, specialty, photo, salon_id')
+        .select('id, name, specialty, photo, salon_id, available_days, available_hours')
         .eq('id', professionalId)
         .maybeSingle();
 
@@ -123,12 +167,29 @@ export default function ProfessionalDashboard() {
         throw new Error('Profissional não encontrado');
       }
 
-      setProfessional(prof);
+      const availableHours = (prof.available_hours as any) || { start: '09:00', end: '18:00' };
+      const mappedProfessional: Professional = {
+        id: prof.id,
+        name: prof.name,
+        specialty: prof.specialty,
+        photo: prof.photo,
+        salon_id: prof.salon_id,
+        available_days: prof.available_days || [1, 2, 3, 4, 5, 6],
+        available_hours: { start: availableHours.start || '09:00', end: availableHours.end || '18:00' },
+      };
+      
+      setProfessional(mappedProfessional);
+      
+      // Initialize edit state
+      setEditPhoto(mappedProfessional.photo || '');
+      setEditDays(mappedProfessional.available_days);
+      setEditHoursStart(mappedProfessional.available_hours.start);
+      setEditHoursEnd(mappedProfessional.available_hours.end);
 
       // Load salon
       const { data: salonData, error: salonError } = await supabase
         .from('salons')
-        .select('id, name, logo_url, logo_format, theme_preset, custom_colors')
+        .select('id, name, slug, logo_url, logo_format, theme_preset, custom_colors')
         .eq('id', prof.salon_id)
         .maybeSingle();
 
@@ -138,17 +199,29 @@ export default function ProfessionalDashboard() {
 
       setSalon(salonData as SalonData);
 
+      // Load all salon services
+      const { data: servicesData } = await supabase
+        .from('services')
+        .select('id, name, price, duration')
+        .eq('salon_id', prof.salon_id)
+        .eq('is_active', true);
+      
+      setAllServices(servicesData || []);
+
+      // Load professional services
+      const { data: profServicesData } = await supabase
+        .from('professional_services')
+        .select('service_id')
+        .eq('professional_id', professionalId);
+      
+      const profServiceIds = (profServicesData || []).map(ps => ps.service_id);
+      setProfessionalServices(profServiceIds);
+      setEditServices(profServiceIds);
+
       // Load appointments with services
       const { data: appts, error: apptsError } = await supabase
         .from('appointments')
-        .select(`
-          id,
-          date,
-          time,
-          status,
-          client_name,
-          service_id
-        `)
+        .select('id, date, time, status, client_name, service_id')
         .eq('professional_id', professionalId)
         .order('date', { ascending: false })
         .order('time', { ascending: false });
@@ -157,15 +230,15 @@ export default function ProfessionalDashboard() {
 
       // Get service details
       const serviceIds = [...new Set((appts || []).map(a => a.service_id).filter(Boolean))];
-      let servicesMap: Record<string, { id: string; name: string; price: number; duration: number }> = {};
+      let servicesMap: Record<string, Service> = {};
       
       if (serviceIds.length > 0) {
-        const { data: servicesData } = await supabase
+        const { data: svcData } = await supabase
           .from('services')
           .select('id, name, price, duration')
           .in('id', serviceIds);
         
-        servicesMap = (servicesData || []).reduce((acc, s) => {
+        servicesMap = (svcData || []).reduce((acc, s) => {
           acc[s.id] = s;
           return acc;
         }, {} as typeof servicesMap);
@@ -190,6 +263,100 @@ export default function ProfessionalDashboard() {
       toast({ title: 'Erro ao carregar dados', variant: 'destructive' });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result as string;
+      setEditPhoto(result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemovePhoto = () => {
+    setEditPhoto('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleDayToggle = (day: number) => {
+    setEditDays(prev => 
+      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort()
+    );
+  };
+
+  const handleServiceToggle = (serviceId: string) => {
+    setEditServices(prev => 
+      prev.includes(serviceId) ? prev.filter(s => s !== serviceId) : [...prev, serviceId]
+    );
+  };
+
+  const handleSaveSettings = async () => {
+    if (!professional) return;
+    
+    setIsSaving(true);
+    try {
+      // Update professional
+      const { error: profError } = await supabase
+        .from('professionals')
+        .update({
+          photo: editPhoto || null,
+          available_days: editDays,
+          available_hours: { start: editHoursStart, end: editHoursEnd },
+        })
+        .eq('id', professional.id);
+      
+      if (profError) throw profError;
+
+      // Update services
+      await supabase.from('professional_services').delete().eq('professional_id', professional.id);
+      if (editServices.length > 0) {
+        const rows = editServices.map(serviceId => ({
+          professional_id: professional.id,
+          service_id: serviceId,
+        }));
+        const { error } = await supabase.from('professional_services').insert(rows);
+        if (error) throw error;
+      }
+
+      toast({ title: 'Configurações salvas com sucesso!' });
+      
+      // Update local state
+      setProfessional({
+        ...professional,
+        photo: editPhoto || null,
+        available_days: editDays,
+        available_hours: { start: editHoursStart, end: editHoursEnd },
+      });
+      setProfessionalServices(editServices);
+      setShowSettings(false);
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      toast({ title: 'Erro ao salvar configurações', variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const getClientLink = () => {
+    const baseUrl = window.location.origin;
+    if (salon?.slug) {
+      return `${baseUrl}/salao/${salon.slug}/profissional/${professionalId}`;
+    }
+    return `${baseUrl}/salon/${salon?.id}/professional/${professionalId}`;
+  };
+
+  const copyClientLink = async () => {
+    try {
+      await navigator.clipboard.writeText(getClientLink());
+      setCopied(true);
+      toast({ title: 'Link copiado com sucesso!' });
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast({ title: 'Erro ao copiar link', variant: 'destructive' });
     }
   };
 
@@ -228,6 +395,9 @@ export default function ProfessionalDashboard() {
   const upcomingAppointments = appointments
     .filter(a => a.date >= todayStr && (a.status === 'confirmed' || a.status === 'pending'))
     .slice(0, 5);
+
+  // Filter services to only show those assigned to this professional
+  const myServices = allServices.filter(s => professionalServices.includes(s.id));
 
   if (isLoading) {
     return (
@@ -279,6 +449,157 @@ export default function ProfessionalDashboard() {
       </header>
 
       <main className="container mx-auto px-4 py-6 max-w-4xl space-y-6">
+        {/* Actions row */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={copyClientLink}
+          >
+            {copied ? <Check className="w-4 h-4 text-green-500" /> : <Link className="w-4 h-4" />}
+            Copiar link para clientes
+          </Button>
+          <Button
+            variant={showSettings ? 'secondary' : 'outline'}
+            className="gap-2"
+            onClick={() => setShowSettings(!showSettings)}
+          >
+            <Settings className="w-4 h-4" />
+            Configurações
+            {showSettings ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </Button>
+        </div>
+
+        {/* Settings panel */}
+        {showSettings && (
+          <Card className="p-6 border-0 shadow-card animate-fade-in-up">
+            <h2 className="text-lg font-display font-semibold text-foreground mb-4 flex items-center gap-2">
+              <Settings className="w-5 h-5 text-primary" />
+              Minhas Configurações
+            </h2>
+            
+            <div className="space-y-6">
+              {/* Photo */}
+              <div className="space-y-2">
+                <Label>Foto de Perfil</Label>
+                <div className="flex items-start gap-4">
+                  <div className="relative w-20 h-20 bg-muted border-2 border-dashed border-border rounded-full overflow-hidden flex items-center justify-center">
+                    {editPhoto ? (
+                      <>
+                        <img src={editPhoto} alt="Foto" className="w-full h-full object-cover rounded-full" />
+                        <button
+                          type="button"
+                          onClick={handleRemovePhoto}
+                          className="absolute top-0 right-0 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center hover:bg-destructive/80"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </>
+                    ) : (
+                      <div className="text-center p-2">
+                        <Upload className="w-5 h-5 mx-auto text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="hidden"
+                      id="prof-photo-upload"
+                    />
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      Escolher Foto
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Available days */}
+              <div className="space-y-2">
+                <Label>Dias de Trabalho</Label>
+                <div className="flex flex-wrap gap-2">
+                  {weekDays.map(day => (
+                    <div key={day.value} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`edit-day-${day.value}`}
+                        checked={editDays.includes(day.value)}
+                        onCheckedChange={() => handleDayToggle(day.value)}
+                      />
+                      <Label htmlFor={`edit-day-${day.value}`} className="text-sm cursor-pointer">
+                        {day.label}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Hours */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-start">Horário Início</Label>
+                  <Input
+                    id="edit-start"
+                    type="time"
+                    value={editHoursStart}
+                    onChange={(e) => setEditHoursStart(e.target.value)}
+                    className="input-elegant"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-end">Horário Fim</Label>
+                  <Input
+                    id="edit-end"
+                    type="time"
+                    value={editHoursEnd}
+                    onChange={(e) => setEditHoursEnd(e.target.value)}
+                    className="input-elegant"
+                  />
+                </div>
+              </div>
+
+              {/* Services */}
+              {allServices.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Serviços que Executo</Label>
+                  <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 border rounded-lg">
+                    {allServices.map(service => (
+                      <div key={service.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`edit-service-${service.id}`}
+                          checked={editServices.includes(service.id)}
+                          onCheckedChange={() => handleServiceToggle(service.id)}
+                        />
+                        <Label htmlFor={`edit-service-${service.id}`} className="text-sm cursor-pointer">
+                          {service.name}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <Button
+                variant="gradient"
+                className="w-full gap-2"
+                onClick={handleSaveSettings}
+                disabled={isSaving}
+              >
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Salvar Configurações
+              </Button>
+            </div>
+          </Card>
+        )}
+
         {/* Period selector */}
         <div className="flex gap-2">
           <button
@@ -337,8 +658,8 @@ export default function ProfessionalDashboard() {
                 <Scissors className="w-5 h-5 text-secondary" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Serviços</p>
-                <p className="text-lg font-semibold text-foreground">{serviceStats.length}</p>
+                <p className="text-xs text-muted-foreground">Meus Serviços</p>
+                <p className="text-lg font-semibold text-foreground">{myServices.length}</p>
               </div>
             </div>
           </Card>

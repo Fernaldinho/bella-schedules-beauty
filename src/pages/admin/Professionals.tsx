@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { SubscriptionGate } from '@/components/SubscriptionGate';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ProfessionalForm } from '@/components/admin/ProfessionalForm';
-import { Plus, Pencil, Trash2, Link, BarChart3, Copy, Check } from 'lucide-react';
+import { Plus, Pencil, Trash2, Link, LayoutDashboard, Check } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -45,6 +46,7 @@ type DbService = { id: string; name: string };
 type LinkRow = { professional_id: string; service_id: string };
 
 export default function Professionals() {
+  const navigate = useNavigate();
   const [salonId, setSalonId] = useState<string | null>(null);
   const [salonSlug, setSalonSlug] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -294,7 +296,7 @@ export default function Professionals() {
                     
                     {/* Link buttons */}
                     <div className="pt-4 border-t border-border space-y-2">
-                      <p className="text-sm font-medium text-muted-foreground mb-2">Links</p>
+                      <p className="text-sm font-medium text-muted-foreground mb-2">Ações</p>
                       <div className="flex flex-col sm:flex-row gap-2">
                         <Button
                           variant="outline"
@@ -310,17 +312,13 @@ export default function Professionals() {
                           Link para clientes
                         </Button>
                         <Button
-                          variant="outline"
+                          variant="gradient"
                           size="sm"
                           className="flex-1 gap-2"
-                          onClick={() => copyToClipboard(getDashboardLink(professional.id), `dashboard-${professional.id}`)}
+                          onClick={() => navigate(`/profissional/${professional.id}`)}
                         >
-                          {copiedId === `dashboard-${professional.id}` ? (
-                            <Check className="w-4 h-4 text-green-500" />
-                          ) : (
-                            <BarChart3 className="w-4 h-4" />
-                          )}
-                          Painel do profissional
+                          <LayoutDashboard className="w-4 h-4" />
+                          Entrar no painel
                         </Button>
                       </div>
                     </div>
