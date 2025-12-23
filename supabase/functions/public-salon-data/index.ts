@@ -111,23 +111,33 @@ serve(async (req) => {
 
     const isSubscriptionActive = subscription?.status === "active";
 
+    // Buscar profissionais ativos do salão - apenas campos públicos
     const { data: professionals } = await admin
       .from("professionals")
-      .select("*")
+      .select("id, name, specialty, photo, available_days, available_hours")
       .eq("salon_id", salon.id)
       .eq("is_active", true)
       .order("created_at", { ascending: true });
 
+    // Buscar serviços ativos do salão - apenas campos públicos
     const { data: services } = await admin
       .from("services")
-      .select("*")
+      .select("id, name, price, duration, category")
       .eq("salon_id", salon.id)
       .eq("is_active", true)
       .order("created_at", { ascending: true });
 
-    const { data: professionalServices } = await admin
-      .from("professional_services")
-      .select("*");
+    // CORREÇÃO DE SEGURANÇA: Filtrar professional_services apenas pelos profissionais deste salão
+    const professionalIds = (professionals || []).map((p: { id: string }) => p.id);
+    
+    let professionalServices: { professional_id: string; service_id: string }[] = [];
+    if (professionalIds.length > 0) {
+      const { data: psData } = await admin
+        .from("professional_services")
+        .select("professional_id, service_id")
+        .in("professional_id", professionalIds);
+      professionalServices = psData || [];
+    }
 
     console.log("public-salon-data: loaded", {
       salonId: salon.id,
@@ -141,12 +151,10 @@ serve(async (req) => {
         salon,
         professionals: professionals ?? [],
         services: services ?? [],
-        professionalServices: professionalServices ?? [],
+        professionalServices,
         subscription: {
           isActive: isSubscriptionActive,
-          status: subscription?.status ?? "inactive",
-          plan: subscription?.plan ?? null,
-          expiresAt: subscription?.current_period_end ?? null,
+          // NÃO expor detalhes de subscription para usuários públicos
         },
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
