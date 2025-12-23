@@ -60,7 +60,7 @@ interface Service {
 }
 
 export default function ClientBooking() {
-  const { salonId, slug } = useParams();
+  const { salonId, slug, professionalId: preselectedProfessionalId } = useParams();
   const navigate = useNavigate();
   const [step, setStep] = useState<BookingStep>('landing');
   const [isLoading, setIsLoading] = useState(true);
@@ -71,6 +71,7 @@ export default function ClientBooking() {
   const [services, setServices] = useState<Service[]>([]);
   const [professionalServices, setProfessionalServices] = useState<{ professional_id: string; service_id: string }[]>([]);
   const [isSalonActive, setIsSalonActive] = useState(false);
+  const [isProfessionalLocked, setIsProfessionalLocked] = useState(false);
   
   const [selectedProfessional, setSelectedProfessional] = useState<Professional | null>(null);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
@@ -249,6 +250,16 @@ export default function ClientBooking() {
       const active = !!data?.subscription?.isActive && configured;
       setIsSalonActive(active);
 
+      // If professional is pre-selected via URL, find and select them
+      if (preselectedProfessionalId && loadedProfessionals.length > 0) {
+        const preselected = loadedProfessionals.find(p => p.id === preselectedProfessionalId);
+        if (preselected) {
+          setSelectedProfessional(preselected);
+          setIsProfessionalLocked(true);
+          // Skip to service selection on landing click
+        }
+      }
+
       if (loadedSalon?.name) {
         document.title = `${loadedSalon.name} | Agendamento Online`;
       }
@@ -384,7 +395,14 @@ export default function ClientBooking() {
   const handleBack = () => {
     switch (step) {
       case 'professional': setStep('landing'); break;
-      case 'service': setStep('professional'); setSelectedProfessional(null); break;
+      case 'service': 
+        if (isProfessionalLocked) {
+          setStep('landing');
+        } else {
+          setStep('professional'); 
+          setSelectedProfessional(null); 
+        }
+        break;
       case 'date': setStep('service'); setSelectedService(null); break;
       case 'time': setStep('date'); setSelectedDate(undefined); break;
       case 'form': setStep('time'); setSelectedTime(null); break;
@@ -393,12 +411,22 @@ export default function ClientBooking() {
 
   const resetBooking = () => {
     setStep('landing');
-    setSelectedProfessional(null);
+    if (!isProfessionalLocked) {
+      setSelectedProfessional(null);
+    }
     setSelectedService(null);
     setSelectedDate(undefined);
     setSelectedTime(null);
     setClientName('');
     setClientPhone('');
+  };
+
+  const handleStartBooking = () => {
+    if (isProfessionalLocked && selectedProfessional) {
+      setStep('service');
+    } else {
+      setStep('professional');
+    }
   };
 
   // Loading: não renderiza nada visual até ter os dados (evita flash de cores default)
@@ -557,10 +585,19 @@ export default function ClientBooking() {
               <p className="text-muted-foreground mb-8">{salon.description}</p>
               
               {canBook ? (
-                <Button variant="hero" size="xl" onClick={() => setStep('professional')} className="group">
-                  <Sparkles className="w-5 h-5 mr-2" />
-                  Agendar Agora
-                </Button>
+                <div className="space-y-4">
+                  {isProfessionalLocked && selectedProfessional && (
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/10 text-accent">
+                      <span className="text-sm font-medium">Agendando com {selectedProfessional.name}</span>
+                    </div>
+                  )}
+                  <div>
+                    <Button variant="hero" size="xl" onClick={handleStartBooking} className="group">
+                      <Sparkles className="w-5 h-5 mr-2" />
+                      Agendar Agora
+                    </Button>
+                  </div>
+                </div>
               ) : (
                 <div className="p-6 rounded-2xl bg-muted/50 border border-border">
                   <p className="text-muted-foreground mb-2">

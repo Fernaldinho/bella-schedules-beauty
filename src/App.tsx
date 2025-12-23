@@ -8,6 +8,7 @@ import { RequireAuth } from "@/components/auth/RequireAuth";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import ClientBooking from "./pages/ClientBooking";
+import ProfessionalDashboard from "./pages/ProfessionalDashboard";
 import Index from "./pages/Index";
 import Dashboard from "./pages/admin/Dashboard";
 import Services from "./pages/admin/Services";
@@ -35,6 +36,12 @@ const App = () => (
               <Route path="/salao/:slug" element={<ClientBooking />} />
               {/* Backward compatible route */}
               <Route path="/salon/:salonId" element={<ClientBooking />} />
+              {/* Pre-selected professional booking */}
+              <Route path="/salao/:slug/profissional/:professionalId" element={<ClientBooking />} />
+              <Route path="/salon/:salonId/professional/:professionalId" element={<ClientBooking />} />
+
+              {/* Professional dashboard (restricted view) */}
+              <Route path="/profissional/:professionalId" element={<ProfessionalDashboard />} />
 
               <Route path="/booking" element={<Index />} />
 
