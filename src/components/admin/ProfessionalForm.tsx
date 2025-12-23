@@ -1,18 +1,32 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Professional, Service } from '@/types/salon';
-import { useSalon } from '@/contexts/SalonContext';
 import { toast } from '@/hooks/use-toast';
 import { Save, X, Upload } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+
+type UiService = { id: string; name: string };
+
+type UiProfessional = {
+  id: string;
+  name: string;
+  specialty: string;
+  photo: string;
+  availableDays: number[];
+  availableHours: { start: string; end: string };
+  services: string[];
+};
 
 interface ProfessionalFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  professional?: Professional | null;
+  professional?: UiProfessional | null;
+  salonId: string | null;
+  services: UiService[];
+  onSaved?: () => void;
 }
 
 const weekDays = [
@@ -25,11 +39,11 @@ const weekDays = [
   { value: 6, label: 'Sábado' },
 ];
 
-export function ProfessionalForm({ open, onOpenChange, professional }: ProfessionalFormProps) {
-  const { services, addProfessional, updateProfessional } = useSalon();
+export function ProfessionalForm({ open, onOpenChange, professional, salonId, services, onSaved }: ProfessionalFormProps) {
   const isEditing = !!professional;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     specialty: '',
@@ -41,6 +55,8 @@ export function ProfessionalForm({ open, onOpenChange, professional }: Professio
   });
 
   useEffect(() => {
+    if (!open) return;
+
     if (professional) {
       setFormData({
         name: professional.name,
@@ -65,80 +81,118 @@ export function ProfessionalForm({ open, onOpenChange, professional }: Professio
   }, [professional, open]);
 
   const handleDayToggle = (day: number) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       availableDays: prev.availableDays.includes(day)
-        ? prev.availableDays.filter(d => d !== day)
+        ? prev.availableDays.filter((d) => d !== day)
         : [...prev.availableDays, day].sort(),
     }));
   };
 
   const handleServiceToggle = (serviceId: string) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       selectedServices: prev.selectedServices.includes(serviceId)
-        ? prev.selectedServices.filter(s => s !== serviceId)
+        ? prev.selectedServices.filter((s) => s !== serviceId)
         : [...prev.selectedServices, serviceId],
     }));
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = reader.result as string;
-        setFormData(prev => ({ ...prev, photo: result }));
-      };
-      reader.readAsDataURL(file);
-    }
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result as string;
+      setFormData((prev) => ({ ...prev, photo: result }));
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleRemovePhoto = () => {
-    setFormData(prev => ({ ...prev, photo: '/placeholder.svg' }));
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    setFormData((prev) => ({ ...prev, photo: '/placeholder.svg' }));
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!salonId) {
+      toast({ title: 'Salão não encontrado', variant: 'destructive' });
+      return;
+    }
 
     if (!formData.name.trim() || !formData.specialty.trim()) {
       toast({ title: 'Preencha nome e especialidade', variant: 'destructive' });
       return;
     }
 
-    const professionalData = {
-      name: formData.name,
-      specialty: formData.specialty,
-      photo: formData.photo || '/placeholder.svg',
-      services: formData.selectedServices,
-      availableDays: formData.availableDays,
-      availableHours: {
-        start: formData.availableHoursStart,
-        end: formData.availableHoursEnd,
-      },
-    };
+    setIsSaving(true);
+    try {
+      const payload = {
+        salon_id: salonId,
+        name: formData.name.trim(),
+        specialty: formData.specialty.trim(),
+        photo: formData.photo || null,
+        available_days: formData.availableDays,
+        available_hours: { start: formData.availableHoursStart, end: formData.availableHoursEnd },
+        is_active: true,
+      };
 
-    if (isEditing && professional) {
-      updateProfessional(professional.id, professionalData);
-      toast({ title: 'Profissional atualizada com sucesso!' });
-    } else {
-      addProfessional(professionalData);
-      toast({ title: 'Profissional adicionada com sucesso!' });
+      let professionalId = professional?.id;
+
+      if (isEditing && professionalId) {
+        const { error } = await supabase
+          .from('professionals')
+          .update({
+            name: payload.name,
+            specialty: payload.specialty,
+            photo: payload.photo,
+            available_days: payload.available_days,
+            available_hours: payload.available_hours,
+          })
+          .eq('id', professionalId)
+          .eq('salon_id', salonId);
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase
+          .from('professionals')
+          .insert(payload)
+          .select('id')
+          .single();
+        if (error) throw error;
+        professionalId = data.id;
+      }
+
+      if (professionalId) {
+        // Update links
+        await supabase.from('professional_services').delete().eq('professional_id', professionalId);
+        if (formData.selectedServices.length > 0) {
+          const rows = formData.selectedServices.map((serviceId) => ({
+            professional_id: professionalId,
+            service_id: serviceId,
+          }));
+          const { error } = await supabase.from('professional_services').insert(rows);
+          if (error) throw error;
+        }
+      }
+
+      toast({ title: isEditing ? 'Profissional atualizada com sucesso!' : 'Profissional adicionada com sucesso!' });
+      onOpenChange(false);
+      onSaved?.();
+    } catch (error) {
+      console.error('Error saving professional:', error);
+      toast({ title: 'Erro ao salvar profissional', variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
     }
-
-    onOpenChange(false);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl">
-            {isEditing ? 'Editar Profissional' : 'Nova Profissional'}
-          </DialogTitle>
+          <DialogTitle className="font-display text-xl">{isEditing ? 'Editar Profissional' : 'Nova Profissional'}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -171,11 +225,7 @@ export function ProfessionalForm({ open, onOpenChange, professional }: Professio
                 <div className="relative w-24 h-24 bg-muted border-2 border-dashed border-border rounded-full overflow-hidden flex items-center justify-center">
                   {formData.photo && formData.photo !== '/placeholder.svg' ? (
                     <>
-                      <img
-                        src={formData.photo}
-                        alt="Preview"
-                        className="w-full h-full object-cover rounded-full"
-                      />
+                      <img src={formData.photo} alt="Foto da profissional" className="w-full h-full object-cover rounded-full" />
                       <button
                         type="button"
                         onClick={handleRemovePhoto}
@@ -201,19 +251,11 @@ export function ProfessionalForm({ open, onOpenChange, professional }: Professio
                     className="hidden"
                     id="professional-photo-upload"
                   />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-full"
-                  >
+                  <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="w-full">
                     <Upload className="w-4 h-4 mr-2" />
                     Escolher Foto
                   </Button>
-                  <p className="text-xs text-muted-foreground">
-                    JPG, PNG ou WEBP
-                  </p>
+                  <p className="text-xs text-muted-foreground">JPG, PNG ou WEBP</p>
                 </div>
               </div>
             </div>
@@ -285,7 +327,7 @@ export function ProfessionalForm({ open, onOpenChange, professional }: Professio
               <X className="w-4 h-4 mr-2" />
               Cancelar
             </Button>
-            <Button type="submit" variant="gradient" className="flex-1">
+            <Button type="submit" variant="gradient" className="flex-1" disabled={isSaving}>
               <Save className="w-4 h-4 mr-2" />
               {isEditing ? 'Salvar' : 'Adicionar'}
             </Button>

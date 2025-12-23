@@ -59,7 +59,7 @@ interface Service {
 }
 
 export default function ClientBooking() {
-  const { salonId } = useParams();
+  const { salonId, slug } = useParams();
   const navigate = useNavigate();
   const [step, setStep] = useState<BookingStep>('landing');
   const [isLoading, setIsLoading] = useState(true);
@@ -69,6 +69,7 @@ export default function ClientBooking() {
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [professionalServices, setProfessionalServices] = useState<{ professional_id: string; service_id: string }[]>([]);
+  const [isSalonActive, setIsSalonActive] = useState(false);
   
   const [selectedProfessional, setSelectedProfessional] = useState<Professional | null>(null);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
@@ -79,10 +80,10 @@ export default function ClientBooking() {
   const [bookedSlots, setBookedSlots] = useState<string[]>([]);
 
   useEffect(() => {
-    if (salonId) {
+    if (salonId || slug) {
       loadSalonData();
     }
-  }, [salonId]);
+  }, [salonId, slug]);
 
   useEffect(() => {
     if (salon) {
@@ -106,35 +107,54 @@ export default function ClientBooking() {
 
   const loadSalonData = async () => {
     setIsLoading(true);
+
+    const reqSlug = (slug || '').trim();
+    const reqSalonId = (salonId || '').trim();
+
+    console.log('[ClientBooking] loading public salon data', { slug: reqSlug, salonId: reqSalonId });
+
     try {
-      const { data: salonData, error: salonError } = await supabase
-        .from('salons')
-        .select('*')
-        .eq('id', salonId)
-        .single();
+      const { data, error } = await supabase.functions.invoke('public-salon-data', {
+        body: {
+          slug: reqSlug || undefined,
+          salonId: reqSalonId || undefined,
+        },
+      });
 
-      if (salonError) throw salonError;
-      setSalon(salonData as unknown as SalonData);
+      if (error) throw error;
 
-      const { data: profsData } = await supabase
-        .from('professionals')
-        .select('*')
-        .eq('salon_id', salonId);
-      setProfessionals((profsData || []) as unknown as Professional[]);
+      const loadedSalon = (data?.salon || null) as SalonData | null;
+      const loadedProfessionals = ((data?.professionals || []) as unknown as Professional[]);
+      const loadedServices = ((data?.services || []) as unknown as Service[]);
+      const loadedProfessionalServices = (data?.professionalServices || []) as { professional_id: string; service_id: string }[];
 
-      const { data: servicesData } = await supabase
-        .from('services')
-        .select('*')
-        .eq('salon_id', salonId);
-      setServices((servicesData || []) as unknown as Service[]);
+      console.log('[ClientBooking] loaded', {
+        salonFound: !!loadedSalon,
+        professionals: loadedProfessionals.length,
+        services: loadedServices.length,
+        subscriptionActive: !!data?.subscription?.isActive,
+      });
 
-      const { data: psData } = await supabase
-        .from('professional_services')
-        .select('*');
-      setProfessionalServices(psData || []);
+      setSalon(loadedSalon);
+      setProfessionals(loadedProfessionals);
+      setServices(loadedServices);
+      setProfessionalServices(loadedProfessionalServices);
+
+      const configured = loadedProfessionals.length > 0 && loadedServices.length > 0;
+      const active = !!data?.subscription?.isActive && configured;
+      setIsSalonActive(active);
+
+      if (loadedSalon?.name) {
+        document.title = `${loadedSalon.name} | Agendamento Online`;
+      }
     } catch (error) {
       console.error('Error loading salon:', error);
       toast({ title: 'Erro ao carregar dados do salão', variant: 'destructive' });
+      setSalon(null);
+      setProfessionals([]);
+      setServices([]);
+      setProfessionalServices([]);
+      setIsSalonActive(false);
     } finally {
       setIsLoading(false);
     }
@@ -347,7 +367,7 @@ export default function ClientBooking() {
 
   // Landing
   if (step === 'landing') {
-    const canBook = professionals.length > 0 && services.length > 0;
+    const canBook = isSalonActive;
     
     return (
       <div className="min-h-screen bg-background">
