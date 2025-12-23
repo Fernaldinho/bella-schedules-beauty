@@ -39,13 +39,39 @@ export interface Client {
 }
 
 export type ImageFormat = 'square' | 'rectangular' | 'circular';
+
+// Novo sistema de aparência guiada
+export type SalonStyle = 'luxo' | 'delicado' | 'moderno' | 'natural' | 'impactante';
+export type ButtonEmphasis = 'discreto' | 'equilibrado' | 'chamativo';
+export type ColorMode = 'has_colors' | 'no_colors';
+
+export interface SalonAppearance {
+  style: SalonStyle;
+  colorMode: ColorMode;
+  colorCount: 1 | 2 | 3;
+  primaryColor: string;      // Cor principal (HSL)
+  secondaryColor: string;    // Cor secundária (HSL)
+  supportColor: string;      // Cor de apoio (HSL)
+  buttonEmphasis: ButtonEmphasis;
+}
+
+// Cores finais calculadas pelo sistema
+export interface ComputedColors {
+  buttonBackground: string;
+  buttonText: string;
+  gradientStart: string;
+  gradientEnd: string;
+  accent: string;
+}
+
+// Mantido para compatibilidade
 export type ThemePreset = 'purple' | 'rose' | 'gold' | 'custom';
 
 export interface CustomColors {
-  primary: string;       // Cor do botão
-  primaryForeground: string; // Cor do texto do botão
-  secondary: string;     // Cor do fundo (início do degradê)
-  accent: string;        // Cor do fundo (fim do degradê)
+  primary: string;
+  primaryForeground: string;
+  secondary: string;
+  accent: string;
 }
 
 export interface SocialMedia {
@@ -71,16 +97,10 @@ export interface SalonSettings {
   logoFormat: ImageFormat;
   themePreset: ThemePreset;
   customColors: CustomColors;
+  appearance?: SalonAppearance;
   priceColor: string;
   socialMedia: SocialMedia;
-  openingHours: { start: string; end: string };
-  workingDays: number[];
   stats: SalonStats;
-}
-
-export interface Subscription {
-  isActive: boolean;
-  plan: 'pro' | null;
-  price: number;
-  expiresAt: string | null;
+  workingDays: number[];
+  openingHours: { start: string; end: string };
 }
