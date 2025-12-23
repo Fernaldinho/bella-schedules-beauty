@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ProfessionalForm } from '@/components/admin/ProfessionalForm';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Link, BarChart3, Copy, Check } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -46,6 +46,7 @@ type LinkRow = { professional_id: string; service_id: string };
 
 export default function Professionals() {
   const [salonId, setSalonId] = useState<string | null>(null);
+  const [salonSlug, setSalonSlug] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const [professionals, setProfessionals] = useState<UiProfessional[]>([]);
@@ -56,6 +57,7 @@ export default function Professionals() {
   const [editingProfessional, setEditingProfessional] = useState<UiProfessional | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [professionalToDelete, setProfessionalToDelete] = useState<UiProfessional | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
@@ -79,18 +81,20 @@ export default function Professionals() {
 
       const { data: salon, error: salonError } = await supabase
         .from('salons')
-        .select('id')
+        .select('id, slug')
         .eq('owner_id', auth.user.id)
         .maybeSingle();
       if (salonError) throw salonError;
       if (!salon?.id) {
         setSalonId(null);
+        setSalonSlug(null);
         setProfessionals([]);
         setServices([]);
         setLinks([]);
         return;
       }
       setSalonId(salon.id);
+      setSalonSlug(salon.slug || null);
 
       const [{ data: profs }, { data: svcs }, { data: ps }] = await Promise.all([
         supabase
@@ -174,6 +178,30 @@ export default function Professionals() {
       setDeleteDialogOpen(false);
       setProfessionalToDelete(null);
     }
+  };
+
+  const copyToClipboard = async (text: string, id: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      toast({ title: 'Link copiado com sucesso!' });
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      toast({ title: 'Erro ao copiar link', variant: 'destructive' });
+    }
+  };
+
+  const getClientLink = (professionalId: string) => {
+    const baseUrl = window.location.origin;
+    if (salonSlug) {
+      return `${baseUrl}/salao/${salonSlug}/profissional/${professionalId}`;
+    }
+    return `${baseUrl}/salon/${salonId}/professional/${professionalId}`;
+  };
+
+  const getDashboardLink = (professionalId: string) => {
+    const baseUrl = window.location.origin;
+    return `${baseUrl}/profissional/${professionalId}`;
   };
 
   return (
@@ -261,6 +289,39 @@ export default function Professionals() {
                             {service.name}
                           </Badge>
                         ))}
+                      </div>
+                    </div>
+                    
+                    {/* Link buttons */}
+                    <div className="pt-4 border-t border-border space-y-2">
+                      <p className="text-sm font-medium text-muted-foreground mb-2">Links</p>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 gap-2"
+                          onClick={() => copyToClipboard(getClientLink(professional.id), `client-${professional.id}`)}
+                        >
+                          {copiedId === `client-${professional.id}` ? (
+                            <Check className="w-4 h-4 text-green-500" />
+                          ) : (
+                            <Link className="w-4 h-4" />
+                          )}
+                          Link para clientes
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 gap-2"
+                          onClick={() => copyToClipboard(getDashboardLink(professional.id), `dashboard-${professional.id}`)}
+                        >
+                          {copiedId === `dashboard-${professional.id}` ? (
+                            <Check className="w-4 h-4 text-green-500" />
+                          ) : (
+                            <BarChart3 className="w-4 h-4" />
+                          )}
+                          Painel do profissional
+                        </Button>
                       </div>
                     </div>
                   </div>
