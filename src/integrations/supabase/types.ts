@@ -288,6 +288,8 @@ export type Database = {
           created_at: string
           current_period_end: string | null
           id: string
+          last_webhook_at: string | null
+          last_webhook_event: string | null
           plan: string | null
           price: number | null
           status: string
@@ -300,6 +302,8 @@ export type Database = {
           created_at?: string
           current_period_end?: string | null
           id?: string
+          last_webhook_at?: string | null
+          last_webhook_event?: string | null
           plan?: string | null
           price?: number | null
           status?: string
@@ -312,6 +316,8 @@ export type Database = {
           created_at?: string
           current_period_end?: string | null
           id?: string
+          last_webhook_at?: string | null
+          last_webhook_event?: string | null
           plan?: string | null
           price?: number | null
           status?: string
