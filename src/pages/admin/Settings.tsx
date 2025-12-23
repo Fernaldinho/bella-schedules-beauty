@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { SubscriptionGate } from '@/components/SubscriptionGate';
 import { useSalon } from '@/contexts/SalonContext';
+import { useUserInfo } from '@/hooks/useUserInfo';
+import { useSubscription } from '@/hooks/useSubscription';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/hooks/use-toast';
-import { Save, Store, Clock, Palette, Image, Share2, DollarSign, CalendarDays, Star, Globe } from 'lucide-react';
+import { Save, Store, Clock, Palette, Image, Share2, DollarSign, CalendarDays, Star, Globe, User, CreditCard, Loader2, ExternalLink } from 'lucide-react';
 import { ImageUploader } from '@/components/admin/ImageUploader';
 import { ThemeSelector } from '@/components/admin/ThemeSelector';
 import { ColorPicker } from '@/components/admin/ColorPicker';
@@ -28,6 +30,10 @@ const WEEK_DAYS = [
 
 export default function Settings() {
   const { settings, updateSettings } = useSalon();
+  const { user, subscription: userSubscription, salon, isLoading: userLoading } = useUserInfo();
+  const { isActive, openBillingPortal, createCheckout } = useSubscription();
+  const [isManaging, setIsManaging] = useState(false);
+  
   const [formData, setFormData] = useState({
     name: settings.name,
     description: settings.description,
@@ -115,6 +121,30 @@ export default function Settings() {
     toast({ title: 'Configurações salvas com sucesso!' });
   };
 
+  const handleManageSubscription = async () => {
+    setIsManaging(true);
+    try {
+      if (isActive) {
+        await openBillingPortal();
+      } else {
+        await createCheckout();
+      }
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível processar. Tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsManaging(false);
+    }
+  };
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return '-';
+    return new Date(dateStr).toLocaleDateString('pt-BR');
+  };
+
   return (
     <AdminLayout>
       <div className="space-y-8">
@@ -133,6 +163,92 @@ export default function Settings() {
             <ClientPageLinks />
           </Card>
         </div>
+
+        {/* User Account Section */}
+        <Card className="p-6 border-0 shadow-card">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center">
+              <User className="w-5 h-5 text-primary-foreground" />
+            </div>
+            <h2 className="font-display font-semibold text-lg text-foreground">Minha Conta</h2>
+          </div>
+          
+          {userLoading ? (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Nome</p>
+                  <p className="font-medium text-foreground">{user?.name || '-'}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Email</p>
+                  <p className="font-medium text-foreground">{user?.email || '-'}</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </Card>
+
+        {/* Subscription Section */}
+        <Card className="p-6 border-0 shadow-card">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center">
+              <CreditCard className="w-5 h-5 text-primary-foreground" />
+            </div>
+            <h2 className="font-display font-semibold text-lg text-foreground">Assinatura</h2>
+          </div>
+          
+          {userLoading ? (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Status</p>
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      isActive 
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
+                        : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
+                    }`}>
+                      {isActive ? 'PRO Ativo' : 'Inativo'}
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Plano</p>
+                  <p className="font-medium text-foreground capitalize">{userSubscription?.plan || 'Free'}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Válido até</p>
+                  <p className="font-medium text-foreground">{formatDate(userSubscription?.expiresAt || null)}</p>
+                </div>
+              </div>
+              
+              <div className="pt-4 border-t border-border">
+                <Button
+                  onClick={handleManageSubscription}
+                  disabled={isManaging}
+                  variant={isActive ? "outline" : "gradient"}
+                  className="gap-2"
+                >
+                  {isManaging ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <ExternalLink className="w-4 h-4" />
+                  )}
+                  {isActive ? 'Gerenciar Assinatura' : 'Ativar Plano PRO – R$45,30/mês'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
 
         <SubscriptionGate fallbackMessage="Assine o plano PRO para acessar as configurações.">
           <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl">

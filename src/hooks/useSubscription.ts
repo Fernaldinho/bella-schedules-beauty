@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface SubscriptionState {
   isActive: boolean;
   isLoading: boolean;
-  plan: string | null;
+  plan: string;
+  status: string;
   expiresAt: string | null;
 }
 
@@ -12,41 +13,63 @@ export function useSubscription() {
   const [subscription, setSubscription] = useState<SubscriptionState>({
     isActive: false,
     isLoading: true,
-    plan: null,
+    plan: 'free',
+    status: 'inactive',
     expiresAt: null,
   });
 
-  const checkSubscription = async () => {
+  const checkSubscription = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setSubscription({ isActive: false, isLoading: false, plan: null, expiresAt: null });
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        setSubscription({ 
+          isActive: false, 
+          isLoading: false, 
+          plan: 'free', 
+          status: 'inactive',
+          expiresAt: null 
+        });
         return;
       }
 
-      const { data, error } = await supabase
-        .from('subscriptions')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
+      // Call the subscription-check edge function
+      const { data, error } = await supabase.functions.invoke('subscription-check', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
 
-      if (error || !data) {
-        setSubscription({ isActive: false, isLoading: false, plan: null, expiresAt: null });
+      if (error) {
+        console.error('Error checking subscription:', error);
+        setSubscription({ 
+          isActive: false, 
+          isLoading: false, 
+          plan: 'free', 
+          status: 'inactive',
+          expiresAt: null 
+        });
         return;
       }
 
-      const isActive = data.status === 'active';
       setSubscription({
-        isActive,
+        isActive: data?.isActive || false,
         isLoading: false,
-        plan: data.plan,
-        expiresAt: data.current_period_end,
+        plan: data?.plan || 'free',
+        status: data?.status || 'inactive',
+        expiresAt: data?.expiresAt || null,
       });
     } catch (error) {
       console.error('Error checking subscription:', error);
-      setSubscription({ isActive: false, isLoading: false, plan: null, expiresAt: null });
+      setSubscription({ 
+        isActive: false, 
+        isLoading: false, 
+        plan: 'free', 
+        status: 'inactive',
+        expiresAt: null 
+      });
     }
-  };
+  }, []);
 
   const createCheckout = async () => {
     try {
@@ -62,11 +85,40 @@ export function useSubscription() {
       });
 
       if (error) throw error;
+      
       if (data?.url) {
         window.location.href = data.url;
+      } else {
+        throw new Error('No checkout URL returned');
       }
     } catch (error) {
       console.error('Error creating checkout:', error);
+      throw error;
+    }
+  };
+
+  const openBillingPortal = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
+      const { data, error } = await supabase.functions.invoke('manage-subscription', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+      
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('No portal URL returned');
+      }
+    } catch (error) {
+      console.error('Error opening billing portal:', error);
       throw error;
     }
   };
@@ -79,11 +131,12 @@ export function useSubscription() {
     });
 
     return () => authSubscription.unsubscribe();
-  }, []);
+  }, [checkSubscription]);
 
   return {
     ...subscription,
     checkSubscription,
     createCheckout,
+    openBillingPortal,
   };
 }
