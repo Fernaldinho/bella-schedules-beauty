@@ -107,8 +107,9 @@ export default function ProfessionalDashboard() {
   const [editHoursEnd, setEditHoursEnd] = useState('18:00');
   const [editServices, setEditServices] = useState<string[]>([]);
   
-  // Link copy state
-  const [copied, setCopied] = useState(false);
+  // Link copy states
+  const [copiedStore, setCopiedStore] = useState(false);
+  const [copiedPanel, setCopiedPanel] = useState(false);
 
   // Calculate date ranges based on period
   const dateRange = useMemo(() => {
@@ -448,7 +449,23 @@ export default function ProfessionalDashboard() {
     }
   };
 
-  const getClientLink = () => {
+  // Link da loja (para clientes agendarem)
+  const getStoreLink = () => {
+    const baseUrl = window.location.origin;
+    if (salon?.slug) {
+      return `${baseUrl}/salao/${salon.slug}`;
+    }
+    return `${baseUrl}/salon/${salon?.id}`;
+  };
+
+  // Link personalizado do profissional (painel dele)
+  const getProfessionalPanelLink = () => {
+    const baseUrl = window.location.origin;
+    return `${baseUrl}/profissional/${professionalId}`;
+  };
+
+  // Link de agendamento direto com o profissional (para clientes)
+  const getClientBookingLink = () => {
     const baseUrl = window.location.origin;
     if (salon?.slug) {
       return `${baseUrl}/salao/${salon.slug}/profissional/${professionalId}`;
@@ -456,15 +473,31 @@ export default function ProfessionalDashboard() {
     return `${baseUrl}/salon/${salon?.id}/professional/${professionalId}`;
   };
 
-  const copyClientLink = async () => {
+
+  const copyStoreLink = async () => {
     try {
-      await navigator.clipboard.writeText(getClientLink());
-      setCopied(true);
-      toast({ title: 'Link copiado com sucesso!' });
-      setTimeout(() => setCopied(false), 2000);
+      await navigator.clipboard.writeText(getStoreLink());
+      setCopiedStore(true);
+      toast({ title: 'Link da loja copiado!' });
+      setTimeout(() => setCopiedStore(false), 2000);
     } catch {
       toast({ title: 'Erro ao copiar link', variant: 'destructive' });
     }
+  };
+
+  const copyPanelLink = async () => {
+    try {
+      await navigator.clipboard.writeText(getProfessionalPanelLink());
+      setCopiedPanel(true);
+      toast({ title: 'Link do painel copiado!' });
+      setTimeout(() => setCopiedPanel(false), 2000);
+    } catch {
+      toast({ title: 'Erro ao copiar link', variant: 'destructive' });
+    }
+  };
+
+  const openPanelLink = () => {
+    window.open(getProfessionalPanelLink(), '_blank');
   };
 
   const formatPrice = (price: number) => 
@@ -561,16 +594,55 @@ export default function ProfessionalDashboard() {
       </header>
 
       <main className="container mx-auto px-4 py-6 max-w-4xl space-y-6">
-        {/* Actions row */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={copyClientLink}
-          >
-            {copied ? <Check className="w-4 h-4 text-green-500" /> : <Link className="w-4 h-4" />}
-            Copiar link para clientes
-          </Button>
+        {/* Links section */}
+        <Card className="p-4 border-0 shadow-card">
+          <h3 className="text-sm font-medium text-muted-foreground mb-3">Links</h3>
+          <div className="flex flex-col sm:flex-row gap-3">
+            {/* Link da Loja */}
+            <div className="flex-1 flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-muted-foreground">Link da Loja</p>
+                <p className="text-sm font-medium text-foreground truncate">{getStoreLink()}</p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="shrink-0"
+                onClick={copyStoreLink}
+              >
+                {copiedStore ? <Check className="w-4 h-4 text-green-500" /> : <Link className="w-4 h-4" />}
+              </Button>
+            </div>
+
+            {/* Link Personalizado (Painel do Profissional) */}
+            <div className="flex-1 flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-muted-foreground">Meu Painel</p>
+                <p className="text-sm font-medium text-foreground truncate">{getProfessionalPanelLink()}</p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="shrink-0"
+                onClick={copyPanelLink}
+              >
+                {copiedPanel ? <Check className="w-4 h-4 text-green-500" /> : <Link className="w-4 h-4" />}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="shrink-0 text-blue-500 hover:text-blue-600 hover:bg-blue-50"
+                onClick={openPanelLink}
+                title="Ver painel"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+              </Button>
+            </div>
+          </div>
+        </Card>
+
+        {/* Settings button */}
+        <div className="flex justify-end">
           <Button
             variant={showSettings ? 'secondary' : 'outline'}
             className="gap-2"
