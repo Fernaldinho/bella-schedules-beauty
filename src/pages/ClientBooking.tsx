@@ -347,6 +347,8 @@ export default function ClientBooking() {
 
   // Landing
   if (step === 'landing') {
+    const canBook = professionals.length > 0 && services.length > 0;
+    
     return (
       <div className="min-h-screen bg-background">
         <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
@@ -384,10 +386,21 @@ export default function ClientBooking() {
               
               <p className="text-muted-foreground mb-8">{salon.description}</p>
               
-              <Button variant="hero" size="xl" onClick={() => setStep('professional')} className="group">
-                <Sparkles className="w-5 h-5 mr-2" />
-                Agendar Agora
-              </Button>
+              {canBook ? (
+                <Button variant="hero" size="xl" onClick={() => setStep('professional')} className="group">
+                  <Sparkles className="w-5 h-5 mr-2" />
+                  Agendar Agora
+                </Button>
+              ) : (
+                <div className="p-6 rounded-2xl bg-muted/50 border border-border">
+                  <p className="text-muted-foreground mb-2">
+                    Este salão ainda está configurando seus serviços.
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Em breve você poderá agendar online!
+                  </p>
+                </div>
+              )}
 
               {(salon.social_media?.instagram || salon.social_media?.whatsapp) && (
                 <div className="flex items-center justify-center gap-4 mt-6">
@@ -455,33 +468,43 @@ export default function ClientBooking() {
             <h2 className="text-2xl font-display font-semibold text-foreground">Escolha o Profissional</h2>
             <p className="text-muted-foreground mt-2">Selecione quem vai te atender</p>
           </div>
-          <div className="space-y-3">
-            {professionals.map((prof, i) => (
-              <Card
-                key={prof.id}
-                onClick={() => { setSelectedProfessional(prof); setStep('service'); }}
-                className="p-4 cursor-pointer transition-all duration-300 hover:shadow-card hover:border-primary/30 border-2 border-transparent animate-fade-in"
-                style={{ animationDelay: `${i * 100}ms` }}
-              >
-                <div className="flex items-center gap-4">
-                  {prof.photo ? (
-                    <img src={prof.photo} alt={prof.name} className="w-14 h-14 rounded-full object-cover" />
-                  ) : (
-                    <div className="w-14 h-14 rounded-full gradient-primary flex items-center justify-center text-white font-semibold text-xl">
-                      {prof.name[0]}
+          
+          {professionals.length === 0 ? (
+            <div className="text-center p-8 rounded-2xl bg-muted/50 border border-border">
+              <p className="text-muted-foreground">Nenhum profissional disponível no momento.</p>
+              <Button variant="outline" className="mt-4" onClick={resetBooking}>
+                Voltar
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {professionals.map((prof, i) => (
+                <Card
+                  key={prof.id}
+                  onClick={() => { setSelectedProfessional(prof); setStep('service'); }}
+                  className="p-4 cursor-pointer transition-all duration-300 hover:shadow-card hover:border-primary/30 border-2 border-transparent animate-fade-in"
+                  style={{ animationDelay: `${i * 100}ms` }}
+                >
+                  <div className="flex items-center gap-4">
+                    {prof.photo ? (
+                      <img src={prof.photo} alt={prof.name} className="w-14 h-14 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-14 h-14 rounded-full gradient-primary flex items-center justify-center text-white font-semibold text-xl">
+                        {prof.name[0]}
+                      </div>
+                    )}
+                    <div>
+                      <h3 className="font-medium text-foreground">{prof.name}</h3>
+                      <p className="text-sm text-muted-foreground">{prof.specialty}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {getServicesForProfessional(prof.id).length} serviços disponíveis
+                      </p>
                     </div>
-                  )}
-                  <div>
-                    <h3 className="font-medium text-foreground">{prof.name}</h3>
-                    <p className="text-sm text-muted-foreground">{prof.specialty}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {getServicesForProfessional(prof.id).length} serviços disponíveis
-                    </p>
                   </div>
-                </div>
-              </Card>
-            ))}
-          </div>
+                </Card>
+              ))}
+            </div>
+          )}
         </main>
       </div>
     );
