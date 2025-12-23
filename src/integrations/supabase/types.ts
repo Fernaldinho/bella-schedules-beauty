@@ -184,6 +184,7 @@ export type Database = {
       }
       salons: {
         Row: {
+          appearance: Json | null
           created_at: string
           custom_colors: Json | null
           description: string | null
@@ -205,6 +206,7 @@ export type Database = {
           working_days: number[] | null
         }
         Insert: {
+          appearance?: Json | null
           created_at?: string
           custom_colors?: Json | null
           description?: string | null
@@ -226,6 +228,7 @@ export type Database = {
           working_days?: number[] | null
         }
         Update: {
+          appearance?: Json | null
           created_at?: string
           custom_colors?: Json | null
           description?: string | null
