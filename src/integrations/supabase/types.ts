@@ -366,6 +366,29 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_public_salon_fields: {
+        Args: never
+        Returns: {
+          appearance: Json
+          created_at: string
+          custom_colors: Json
+          description: string
+          id: string
+          logo_format: string
+          logo_url: string
+          name: string
+          opening_hours: Json
+          price_color: string
+          service_color: string
+          slug: string
+          social_media: Json
+          stats: Json
+          theme_preset: string
+          welcome_text: string
+          whatsapp: string
+          working_days: number[]
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
