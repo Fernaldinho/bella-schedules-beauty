@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Scissors, 
@@ -9,12 +9,15 @@ import {
   Crown,
   ChevronLeft,
   Menu,
-  X
+  X,
+  LogOut
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSalon } from '@/contexts/SalonContext';
 import { useSubscription } from '@/hooks/useSubscription';
+import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import { toast } from '@/hooks/use-toast';
 
 const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/admin' },
@@ -33,8 +36,20 @@ interface AdminSidebarProps {
 
 export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const { settings } = useSalon();
   const { isActive: isSubscribed } = useSubscription();
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast({ title: 'Você saiu da conta' });
+      navigate('/auth');
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast({ title: 'Erro ao sair', variant: 'destructive' });
+    }
+  };
 
   return (
     <>
@@ -119,7 +134,7 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
         </nav>
 
         {/* Footer */}
-        <div className="p-4 border-t border-border">
+        <div className="p-4 border-t border-border space-y-2">
           <Link
             to="/"
             onClick={onClose}
@@ -128,6 +143,13 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
             <ChevronLeft className="w-4 h-4" />
             <span>Voltar ao Site</span>
           </Link>
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 text-sm text-destructive hover:text-destructive/80 transition-colors w-full"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>Sair da Conta</span>
+          </button>
         </div>
       </aside>
     </>
