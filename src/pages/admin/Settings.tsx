@@ -45,12 +45,24 @@ export default function Settings() {
     logoUrl: '',
     logoFormat: 'square' as ImageFormat,
     themePreset: 'purple' as ThemePreset,
-    customColors: { primary: '280 60% 50%', secondary: '320 70% 60%', accent: '340 80% 65%' } as CustomColors,
+    customColors: { primary: '280 60% 50%', primaryForeground: '0 0% 100%', secondary: '320 70% 60%', accent: '340 80% 65%' } as CustomColors,
     priceColor: '142 76% 36%',
     socialMedia: { instagram: '', whatsapp: '', facebook: '', tiktok: '' } as SocialMedia,
     workingDays: [1, 2, 3, 4, 5, 6] as number[],
     stats: { rating: '4.9', clientCount: '+500', since: '2020' } as SalonStats,
   });
+
+  // Helper to ensure customColors has all required fields
+  const getCustomColors = (colors: any): CustomColors => {
+    const defaults = { primary: '280 60% 50%', primaryForeground: '0 0% 100%', secondary: '320 70% 60%', accent: '340 80% 65%' };
+    if (!colors) return defaults;
+    return {
+      primary: colors.primary || defaults.primary,
+      primaryForeground: colors.primaryForeground || defaults.primaryForeground,
+      secondary: colors.secondary || defaults.secondary,
+      accent: colors.accent || defaults.accent,
+    };
+  };
 
   // Sync form data with salon data from Supabase
   useEffect(() => {
@@ -66,7 +78,7 @@ export default function Settings() {
         logoUrl: salon.logoUrl || '',
         logoFormat: (salon.logoFormat as ImageFormat) || 'square',
         themePreset: (salon.themePreset as ThemePreset) || 'purple',
-        customColors: salon.customColors || { primary: '280 60% 50%', secondary: '320 70% 60%', accent: '340 80% 65%' },
+        customColors: getCustomColors(salon.customColors),
         priceColor: salon.priceColor || '142 76% 36%',
         socialMedia: salon.socialMedia || { instagram: '', whatsapp: '', facebook: '', tiktok: '' },
         workingDays: salon.workingDays || [1, 2, 3, 4, 5, 6],

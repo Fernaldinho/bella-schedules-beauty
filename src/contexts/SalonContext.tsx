@@ -40,19 +40,22 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   const [salonId, setSalonId] = useState<string | null>(null);
 
   const applyTheme = (themePreset: ThemePreset, customColors?: CustomColors, priceColor?: string) => {
-    const presetThemes: Record<string, { primary: string; secondary: string; accent: string }> = {
+    const presetThemes: Record<string, { primary: string; primaryForeground: string; secondary: string; accent: string }> = {
       purple: {
         primary: '270 70% 50%',
+        primaryForeground: '0 0% 100%',
         secondary: '280 60% 55%',
         accent: '330 80% 60%',
       },
       rose: {
         primary: '350 80% 55%',
+        primaryForeground: '0 0% 100%',
         secondary: '340 75% 60%',
         accent: '350 70% 70%',
       },
       gold: {
         primary: '45 90% 40%',
+        primaryForeground: '0 0% 100%',
         secondary: '40 85% 50%',
         accent: '50 90% 60%',
       },
@@ -60,13 +63,18 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
     
     // Se for custom e tiver cores definidas, usar elas
     const colors = themePreset === 'custom' && customColors
-      ? customColors
+      ? {
+          primary: customColors.primary,
+          primaryForeground: customColors.primaryForeground || '0 0% 100%',
+          secondary: customColors.secondary,
+          accent: customColors.accent,
+        }
       : presetThemes[themePreset] || presetThemes.purple;
     
     const root = document.documentElement;
     
     root.style.setProperty('--primary', colors.primary);
-    root.style.setProperty('--primary-foreground', '0 0% 100%');
+    root.style.setProperty('--primary-foreground', colors.primaryForeground);
     root.style.setProperty('--accent', colors.accent);
     root.style.setProperty('--secondary', colors.secondary);
     

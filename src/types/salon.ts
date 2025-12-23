@@ -42,9 +42,10 @@ export type ImageFormat = 'square' | 'rectangular' | 'circular';
 export type ThemePreset = 'purple' | 'rose' | 'gold' | 'custom';
 
 export interface CustomColors {
-  primary: string;
-  secondary: string;
-  accent: string;
+  primary: string;       // Cor do botão
+  primaryForeground: string; // Cor do texto do botão
+  secondary: string;     // Cor do fundo (início do degradê)
+  accent: string;        // Cor do fundo (fim do degradê)
 }
 
 export interface SocialMedia {

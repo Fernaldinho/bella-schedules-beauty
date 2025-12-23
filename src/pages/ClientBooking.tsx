@@ -32,7 +32,7 @@ interface SalonData {
   logo_url: string;
   logo_format: string;
   theme_preset: string;
-  custom_colors: { primary: string; secondary: string; accent: string };
+  custom_colors: { primary: string; primaryForeground?: string; secondary: string; accent: string };
   price_color: string;
   service_color: string;
   social_media: { instagram: string; whatsapp: string };
@@ -163,7 +163,7 @@ export default function ClientBooking() {
     const root = document.documentElement;
     
     root.style.setProperty('--primary', colors.primary);
-    root.style.setProperty('--primary-foreground', '0 0% 100%');
+    root.style.setProperty('--primary-foreground', colors.primaryForeground);
     root.style.setProperty('--accent', colors.accent);
     root.style.setProperty('--secondary', colors.secondary);
     
@@ -189,17 +189,18 @@ export default function ClientBooking() {
     const preset = salonData.theme_preset || 'purple';
     const customColors = salonData.custom_colors;
     
-    // Presets fixos
-    const presets: Record<string, { primary: string; secondary: string; accent: string }> = {
-      purple: { primary: '270 70% 50%', secondary: '280 60% 55%', accent: '330 80% 60%' },
-      rose: { primary: '350 80% 55%', secondary: '340 75% 60%', accent: '350 70% 70%' },
-      gold: { primary: '45 90% 40%', secondary: '40 85% 50%', accent: '50 90% 60%' },
+    // Presets fixos com primaryForeground
+    const presets: Record<string, { primary: string; primaryForeground: string; secondary: string; accent: string }> = {
+      purple: { primary: '270 70% 50%', primaryForeground: '0 0% 100%', secondary: '280 60% 55%', accent: '330 80% 60%' },
+      rose: { primary: '350 80% 55%', primaryForeground: '0 0% 100%', secondary: '340 75% 60%', accent: '350 70% 70%' },
+      gold: { primary: '45 90% 40%', primaryForeground: '0 0% 100%', secondary: '40 85% 50%', accent: '50 90% 60%' },
     };
     
     // Se for custom e tiver cores definidas, usar elas
     if (preset === 'custom' && customColors) {
       return {
         primary: customColors.primary || '270 70% 50%',
+        primaryForeground: customColors.primaryForeground || '0 0% 100%',
         secondary: customColors.secondary || '320 70% 60%',
         accent: customColors.accent || '330 80% 60%',
       };

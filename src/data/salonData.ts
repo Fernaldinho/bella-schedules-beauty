@@ -94,7 +94,7 @@ export const defaultSalonSettings: SalonSettings = {
   logoUrl: '',
   logoFormat: 'circular',
   themePreset: 'purple',
-  customColors: { primary: '280 60% 50%', secondary: '320 70% 60%', accent: '340 80% 65%' },
+  customColors: { primary: '280 60% 50%', primaryForeground: '0 0% 100%', secondary: '320 70% 60%', accent: '340 80% 65%' },
   priceColor: '142 76% 36%',
   socialMedia: { instagram: '', whatsapp: '', facebook: '', tiktok: '' },
   openingHours: { start: '09:00', end: '19:00' },
