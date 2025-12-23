@@ -21,6 +21,7 @@ import {
   Settings,
   Link,
   Check,
+  Eye,
   Upload,
   X,
   Save,
@@ -109,7 +110,7 @@ export default function ProfessionalDashboard() {
   
   // Link copy states
   const [copiedStore, setCopiedStore] = useState(false);
-  const [copiedPanel, setCopiedPanel] = useState(false);
+  const [copiedPersonal, setCopiedPersonal] = useState(false);
 
   // Calculate date ranges based on period
   const dateRange = useMemo(() => {
@@ -485,19 +486,19 @@ export default function ProfessionalDashboard() {
     }
   };
 
-  const copyPanelLink = async () => {
+  const copyPersonalLink = async () => {
     try {
-      await navigator.clipboard.writeText(getProfessionalPanelLink());
-      setCopiedPanel(true);
-      toast({ title: 'Link do painel copiado!' });
-      setTimeout(() => setCopiedPanel(false), 2000);
+      await navigator.clipboard.writeText(getClientBookingLink());
+      setCopiedPersonal(true);
+      toast({ title: 'Link personalizado copiado!' });
+      setTimeout(() => setCopiedPersonal(false), 2000);
     } catch {
       toast({ title: 'Erro ao copiar link', variant: 'destructive' });
     }
   };
 
-  const openPanelLink = () => {
-    window.open(getProfessionalPanelLink(), '_blank');
+  const openPersonalLink = () => {
+    window.open(getClientBookingLink(), '_blank');
   };
 
   const formatPrice = (price: number) => 
@@ -614,28 +615,28 @@ export default function ProfessionalDashboard() {
               </Button>
             </div>
 
-            {/* Link Personalizado (Painel do Profissional) */}
+            {/* Link Personalizado (agendamento direto com profissional) */}
             <div className="flex-1 flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-muted-foreground">Meu Painel</p>
-                <p className="text-sm font-medium text-foreground truncate">{getProfessionalPanelLink()}</p>
+                <p className="text-xs text-muted-foreground">Link Personalizado</p>
+                <p className="text-sm font-medium text-foreground truncate">{getClientBookingLink()}</p>
               </div>
               <Button
                 variant="ghost"
                 size="sm"
                 className="shrink-0"
-                onClick={copyPanelLink}
+                onClick={copyPersonalLink}
               >
-                {copiedPanel ? <Check className="w-4 h-4 text-green-500" /> : <Link className="w-4 h-4" />}
+                {copiedPersonal ? <Check className="w-4 h-4 text-green-500" /> : <Link className="w-4 h-4" />}
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
                 className="shrink-0 text-blue-500 hover:text-blue-600 hover:bg-blue-50"
-                onClick={openPanelLink}
-                title="Ver painel"
+                onClick={openPersonalLink}
+                title="Ver link personalizado"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                <Eye className="w-4 h-4" />
               </Button>
             </div>
           </div>

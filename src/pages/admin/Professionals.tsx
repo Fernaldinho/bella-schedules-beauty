@@ -302,14 +302,14 @@ export default function Professionals() {
                           variant="outline"
                           size="sm"
                           className="flex-1 gap-2"
-                          onClick={() => copyToClipboard(getClientLink(professional.id), `client-${professional.id}`)}
+                          onClick={() => copyToClipboard(getDashboardLink(professional.id), `dash-${professional.id}`)}
                         >
-                          {copiedId === `client-${professional.id}` ? (
+                          {copiedId === `dash-${professional.id}` ? (
                             <Check className="w-4 h-4 text-green-500" />
                           ) : (
                             <Link className="w-4 h-4" />
                           )}
-                          Link para clientes
+                          Link para profissional
                         </Button>
                         <Button
                           variant="gradient"
