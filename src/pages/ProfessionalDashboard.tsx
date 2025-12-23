@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
@@ -9,12 +9,13 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { AppointmentCard } from '@/components/professional/AppointmentCard';
+import { RevenueFilter, RevenuePeriod } from '@/components/professional/RevenueFilter';
 import { 
   Calendar,
   Clock,
   DollarSign,
   Loader2,
-  User,
   TrendingUp,
   Scissors,
   Settings,
@@ -26,7 +27,7 @@ import {
   ChevronDown,
   ChevronUp
 } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, startOfYear, endOfYear, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface SalonData {
@@ -92,7 +93,11 @@ export default function ProfessionalDashboard() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [allServices, setAllServices] = useState<Service[]>([]);
   const [professionalServices, setProfessionalServices] = useState<string[]>([]);
-  const [period, setPeriod] = useState<'today' | 'month'>('month');
+  
+  // Revenue filter state
+  const [revenuePeriod, setRevenuePeriod] = useState<RevenuePeriod>('month');
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
   
   // Settings state
   const [showSettings, setShowSettings] = useState(false);
@@ -105,19 +110,39 @@ export default function ProfessionalDashboard() {
   // Link copy state
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    if (professionalId) {
-      loadData();
+  // Calculate date ranges based on period
+  const dateRange = useMemo(() => {
+    const now = new Date();
+    switch (revenuePeriod) {
+      case 'week':
+        return {
+          start: format(startOfWeek(now, { locale: ptBR }), 'yyyy-MM-dd'),
+          end: format(endOfWeek(now, { locale: ptBR }), 'yyyy-MM-dd'),
+        };
+      case 'month':
+        return {
+          start: format(startOfMonth(now), 'yyyy-MM-dd'),
+          end: format(endOfMonth(now), 'yyyy-MM-dd'),
+        };
+      case 'year':
+        return {
+          start: format(startOfYear(now), 'yyyy-MM-dd'),
+          end: format(endOfYear(now), 'yyyy-MM-dd'),
+        };
+      case 'custom':
+        return {
+          start: customStart || format(startOfMonth(now), 'yyyy-MM-dd'),
+          end: customEnd || format(endOfMonth(now), 'yyyy-MM-dd'),
+        };
+      default:
+        return {
+          start: format(startOfMonth(now), 'yyyy-MM-dd'),
+          end: format(endOfMonth(now), 'yyyy-MM-dd'),
+        };
     }
-  }, [professionalId]);
+  }, [revenuePeriod, customStart, customEnd]);
 
-  useEffect(() => {
-    if (salon) {
-      applyTheme(salon);
-    }
-  }, [salon]);
-
-  const applyTheme = (salonData: SalonData) => {
+  const applyTheme = useCallback((salonData: SalonData) => {
     const colors = getThemeColors(salonData);
     const root = document.documentElement;
     
@@ -129,7 +154,7 @@ export default function ProfessionalDashboard() {
     const gradient = `linear-gradient(135deg, hsl(${colors.secondary}) 0%, hsl(${colors.accent}) 100%)`;
     root.style.setProperty('--gradient-primary', gradient);
     root.style.setProperty('--gradient-hero', gradient);
-  };
+  }, []);
 
   const getThemeColors = (salonData: SalonData) => {
     const preset = salonData.theme_preset || 'purple';
@@ -153,7 +178,9 @@ export default function ProfessionalDashboard() {
     return presets[preset] || presets.purple;
   };
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
+    if (!professionalId) return;
+    
     setIsLoading(true);
     try {
       // Load professional
@@ -198,6 +225,7 @@ export default function ProfessionalDashboard() {
       }
 
       setSalon(salonData as SalonData);
+      applyTheme(salonData as SalonData);
 
       // Load all salon services
       const { data: servicesData } = await supabase
@@ -264,6 +292,88 @@ export default function ProfessionalDashboard() {
     } finally {
       setIsLoading(false);
     }
+  }, [professionalId, applyTheme]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Realtime subscription
+  useEffect(() => {
+    if (!professionalId) return;
+
+    const channel = supabase
+      .channel(`prof-appointments-${professionalId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'appointments',
+          filter: `professional_id=eq.${professionalId}`,
+        },
+        () => {
+          loadData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [professionalId, loadData]);
+
+  // Appointment actions
+  const handleConfirmAppointment = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .update({ status: 'confirmed' })
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      setAppointments(prev => prev.map(a => 
+        a.id === id ? { ...a, status: 'confirmed' } : a
+      ));
+      toast({ title: 'Agendamento confirmado!' });
+    } catch (error) {
+      toast({ title: 'Erro ao confirmar', variant: 'destructive' });
+    }
+  };
+
+  const handleCancelAppointment = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .update({ status: 'cancelled' })
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      setAppointments(prev => prev.map(a => 
+        a.id === id ? { ...a, status: 'cancelled' } : a
+      ));
+      toast({ title: 'Agendamento cancelado' });
+    } catch (error) {
+      toast({ title: 'Erro ao cancelar', variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteAppointment = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      setAppointments(prev => prev.filter(a => a.id !== id));
+      toast({ title: 'Agendamento excluído' });
+    } catch (error) {
+      toast({ title: 'Erro ao excluir', variant: 'destructive' });
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -299,7 +409,6 @@ export default function ProfessionalDashboard() {
     
     setIsSaving(true);
     try {
-      // Update professional
       const { error: profError } = await supabase
         .from('professionals')
         .update({
@@ -311,7 +420,6 @@ export default function ProfessionalDashboard() {
       
       if (profError) throw profError;
 
-      // Update services
       await supabase.from('professional_services').delete().eq('professional_id', professional.id);
       if (editServices.length > 0) {
         const rows = editServices.map(serviceId => ({
@@ -324,7 +432,6 @@ export default function ProfessionalDashboard() {
 
       toast({ title: 'Configurações salvas com sucesso!' });
       
-      // Update local state
       setProfessional({
         ...professional,
         photo: editPhoto || null,
@@ -364,23 +471,22 @@ export default function ProfessionalDashboard() {
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(price);
 
   const todayStr = format(new Date(), 'yyyy-MM-dd');
-  const monthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd');
-  const monthEnd = format(endOfMonth(new Date()), 'yyyy-MM-dd');
 
-  const filteredAppointments = useMemo(() => {
-    if (period === 'today') {
-      return appointments.filter(a => a.date === todayStr);
-    }
-    return appointments.filter(a => a.date >= monthStart && a.date <= monthEnd);
-  }, [appointments, period, todayStr, monthStart, monthEnd]);
+  // Filtered appointments for revenue
+  const revenueAppointments = useMemo(() => {
+    return appointments.filter(a => 
+      a.date >= dateRange.start && 
+      a.date <= dateRange.end &&
+      (a.status === 'confirmed' || a.status === 'completed')
+    );
+  }, [appointments, dateRange]);
 
-  const confirmedAppointments = filteredAppointments.filter(a => a.status === 'confirmed' || a.status === 'completed');
-
-  const totalRevenue = confirmedAppointments.reduce((sum, a) => sum + (a.service?.price || 0), 0);
+  const totalRevenue = revenueAppointments.reduce((sum, a) => sum + (a.service?.price || 0), 0);
+  const avgRevenue = revenueAppointments.length > 0 ? totalRevenue / revenueAppointments.length : 0;
 
   const serviceStats = useMemo(() => {
     const stats: Record<string, ServiceStats> = {};
-    confirmedAppointments.forEach(a => {
+    revenueAppointments.forEach(a => {
       if (a.service) {
         if (!stats[a.service.id]) {
           stats[a.service.id] = { name: a.service.name, count: 0, revenue: 0 };
@@ -390,13 +496,19 @@ export default function ProfessionalDashboard() {
       }
     });
     return Object.values(stats).sort((a, b) => b.count - a.count);
-  }, [confirmedAppointments]);
+  }, [revenueAppointments]);
 
-  const upcomingAppointments = appointments
-    .filter(a => a.date >= todayStr && (a.status === 'confirmed' || a.status === 'pending'))
-    .slice(0, 5);
+  // Upcoming appointments (not cancelled)
+  const upcomingAppointments = useMemo(() => {
+    return appointments
+      .filter(a => a.date >= todayStr && a.status !== 'cancelled')
+      .sort((a, b) => {
+        if (a.date !== b.date) return a.date.localeCompare(b.date);
+        return a.time.localeCompare(b.time);
+      })
+      .slice(0, 10);
+  }, [appointments, todayStr]);
 
-  // Filter services to only show those assigned to this professional
   const myServices = allServices.filter(s => professionalServices.includes(s.id));
 
   if (isLoading) {
@@ -434,14 +546,14 @@ export default function ProfessionalDashboard() {
               )}
             />
           )}
-          <div className="flex-1">
-            <h1 className="font-display font-semibold text-foreground">{professional.name}</h1>
-            <p className="text-xs text-muted-foreground">{salon.name}</p>
+          <div className="flex-1 min-w-0">
+            <h1 className="font-display font-semibold text-foreground truncate">{professional.name}</h1>
+            <p className="text-xs text-muted-foreground truncate">{salon.name}</p>
           </div>
           {professional.photo ? (
-            <img src={professional.photo} alt={professional.name} className="w-10 h-10 rounded-full object-cover" />
+            <img src={professional.photo} alt={professional.name} className="w-10 h-10 rounded-full object-cover shrink-0" />
           ) : (
-            <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center text-white font-semibold">
+            <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center text-white font-semibold shrink-0">
               {professional.name[0]}
             </div>
           )}
@@ -600,59 +712,54 @@ export default function ProfessionalDashboard() {
           </Card>
         )}
 
-        {/* Period selector */}
-        <div className="flex gap-2">
-          <button
-            onClick={() => setPeriod('today')}
-            className={cn(
-              'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-              period === 'today' 
-                ? 'bg-primary text-primary-foreground' 
-                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-            )}
-          >
-            Hoje
-          </button>
-          <button
-            onClick={() => setPeriod('month')}
-            className={cn(
-              'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-              period === 'month' 
-                ? 'bg-primary text-primary-foreground' 
-                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-            )}
-          >
-            Este Mês
-          </button>
-        </div>
+        {/* Revenue section with filters */}
+        <Card className="p-6 border-0 shadow-card">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+            <h2 className="text-lg font-display font-semibold text-foreground flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-primary" />
+              Receita
+            </h2>
+            <RevenueFilter
+              period={revenuePeriod}
+              onPeriodChange={setRevenuePeriod}
+              customStart={customStart}
+              customEnd={customEnd}
+              onCustomStartChange={setCustomStart}
+              onCustomEndChange={setCustomEnd}
+            />
+          </div>
+          
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <div className="p-4 rounded-xl bg-primary/10">
+              <p className="text-xs text-muted-foreground">Total</p>
+              <p className="text-xl font-bold text-foreground">{formatPrice(totalRevenue)}</p>
+            </div>
+            <div className="p-4 rounded-xl bg-accent/10">
+              <p className="text-xs text-muted-foreground">Atendimentos</p>
+              <p className="text-xl font-bold text-foreground">{revenueAppointments.length}</p>
+            </div>
+            <div className="p-4 rounded-xl bg-secondary/10 col-span-2 sm:col-span-1">
+              <p className="text-xs text-muted-foreground">Média/Atendimento</p>
+              <p className="text-xl font-bold text-foreground">{formatPrice(avgRevenue)}</p>
+            </div>
+          </div>
+        </Card>
 
         {/* Stats cards */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          <Card className="p-4 border-0 shadow-card">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                <DollarSign className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Receita</p>
-                <p className="text-lg font-semibold text-foreground">{formatPrice(totalRevenue)}</p>
-              </div>
-            </div>
-          </Card>
-
+        <div className="grid grid-cols-2 gap-4">
           <Card className="p-4 border-0 shadow-card">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center">
                 <Calendar className="w-5 h-5 text-accent" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Agendamentos</p>
-                <p className="text-lg font-semibold text-foreground">{confirmedAppointments.length}</p>
+                <p className="text-xs text-muted-foreground">Próximos</p>
+                <p className="text-lg font-semibold text-foreground">{upcomingAppointments.length}</p>
               </div>
             </div>
           </Card>
 
-          <Card className="p-4 border-0 shadow-card col-span-2 md:col-span-1">
+          <Card className="p-4 border-0 shadow-card">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center">
                 <Scissors className="w-5 h-5 text-secondary" />
@@ -665,7 +772,7 @@ export default function ProfessionalDashboard() {
           </Card>
         </div>
 
-        {/* Upcoming appointments */}
+        {/* Upcoming appointments with actions */}
         <Card className="p-6 border-0 shadow-card">
           <h2 className="text-lg font-display font-semibold text-foreground mb-4 flex items-center gap-2">
             <Clock className="w-5 h-5 text-primary" />
@@ -676,23 +783,14 @@ export default function ProfessionalDashboard() {
           ) : (
             <div className="space-y-3">
               {upcomingAppointments.map((appt) => (
-                <div key={appt.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <User className="w-5 h-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-foreground">{appt.client_name}</p>
-                      <p className="text-xs text-muted-foreground">{appt.service?.name || 'Serviço'}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-foreground">
-                      {format(parseISO(appt.date), "dd/MM", { locale: ptBR })}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{appt.time}</p>
-                  </div>
-                </div>
+                <AppointmentCard
+                  key={appt.id}
+                  appointment={appt}
+                  onConfirm={handleConfirmAppointment}
+                  onCancel={handleCancelAppointment}
+                  onDelete={handleDeleteAppointment}
+                  formatPrice={formatPrice}
+                />
               ))}
             </div>
           )}

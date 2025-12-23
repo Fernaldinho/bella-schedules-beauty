@@ -271,16 +271,16 @@ export default function Services() {
                 className="p-4 border-0 shadow-soft animate-fade-in"
                 style={{ animationDelay: `${index * 50}ms` }}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 gradient-primary rounded-xl flex items-center justify-center">
-                      <span className="text-primary-foreground font-semibold text-lg">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
+                  <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 gradient-primary rounded-xl flex items-center justify-center shrink-0">
+                      <span className="text-primary-foreground font-semibold text-base sm:text-lg">
                         {service.name.charAt(0)}
                       </span>
                     </div>
-                    <div>
-                      <h3 className="font-medium text-foreground">{service.name}</h3>
-                      <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-medium text-foreground truncate">{service.name}</h3>
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-sm text-muted-foreground mt-1">
                         <span className="flex items-center gap-1">
                           <Clock className="w-3 h-3" />
                           {formatDuration(service.duration)}
@@ -291,19 +291,19 @@ export default function Services() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <span className="text-lg font-semibold text-gradient">{formatPrice(service.price)}</span>
-                    <div className="flex gap-2">
-                      <Button variant="ghost" size="icon" onClick={() => handleEdit(service.id)}>
+                  <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/50">
+                    <span className="text-base sm:text-lg font-semibold text-gradient">{formatPrice(service.price)}</span>
+                    <div className="flex gap-1 sm:gap-2">
+                      <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => handleEdit(service.id)}>
                         <Pencil className="w-4 h-4" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="h-9 w-9"
                         onClick={() => void handleDelete(service.id)}
-                        className="text-destructive hover:text-destructive"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-4 h-4 text-destructive" />
                       </Button>
                     </div>
                   </div>

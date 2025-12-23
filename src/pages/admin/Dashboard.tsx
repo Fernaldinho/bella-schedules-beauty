@@ -126,28 +126,28 @@ export default function Dashboard() {
                       className="p-4 border-0 shadow-soft animate-fade-in"
                       style={{ animationDelay: `${index * 50}ms` }}
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 gradient-primary rounded-xl flex items-center justify-center text-primary-foreground font-semibold">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
+                        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                          <div className="w-10 h-10 sm:w-12 sm:h-12 gradient-primary rounded-xl flex items-center justify-center text-primary-foreground font-semibold text-sm sm:text-base shrink-0">
                             {apt.time}
                           </div>
-                          <div>
-                            <p className="font-medium text-foreground">{apt.clientName}</p>
-                            <p className="text-sm text-muted-foreground">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-foreground truncate">{apt.clientName}</p>
+                            <p className="text-sm text-muted-foreground truncate">
                               {service?.name} • {professional?.name}
                             </p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 self-end sm:self-center">
                           {apt.status === 'confirmed' ? (
-                            <span className="flex items-center gap-1 text-sm text-green-600 bg-green-100 px-3 py-1 rounded-full">
-                              <CheckCircle className="w-4 h-4" />
-                              Confirmado
+                            <span className="flex items-center gap-1 text-xs sm:text-sm text-green-600 bg-green-100 px-2 sm:px-3 py-1 rounded-full">
+                              <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <span className="hidden xs:inline">Confirmado</span>
                             </span>
                           ) : (
-                            <span className="flex items-center gap-1 text-sm text-red-600 bg-red-100 px-3 py-1 rounded-full">
-                              <XCircle className="w-4 h-4" />
-                              Cancelado
+                            <span className="flex items-center gap-1 text-xs sm:text-sm text-red-600 bg-red-100 px-2 sm:px-3 py-1 rounded-full">
+                              <XCircle className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <span className="hidden xs:inline">Cancelado</span>
                             </span>
                           )}
                         </div>
