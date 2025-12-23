@@ -48,8 +48,8 @@ serve(async (req) => {
       customerId = customer.id;
     }
 
-    // Product ID: prod_SPYf7JbeLmDuDQ (Modo Teste)
-    const priceId = "price_1RV26mP29UxAYo1I51TbUcjW";
+    // Product ID: prod_TYLvoH9s7okTp6 (Produção)
+    const priceId = "price_1SbFDcP29UxAYo1Io8zi8kAf";
     
     const baseUrl = req.headers.get("origin") || "https://lovable.dev";
 
