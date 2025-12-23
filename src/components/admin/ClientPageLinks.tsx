@@ -15,12 +15,12 @@ export function ClientPageLinks() {
 
       const { data } = await supabase
         .from('salons')
-        .select('id')
+        .select('slug')
         .eq('owner_id', user.id)
         .single();
 
-      if (data) {
-        setSalonId(data.id);
+      if (data?.slug) {
+        setSalonId(data.slug);
       }
     };
 
@@ -29,7 +29,7 @@ export function ClientPageLinks() {
 
   const getClientPageUrl = () => {
     if (!salonId) return '';
-    return `${window.location.origin}/salon/${salonId}`;
+    return `${window.location.origin}/salao/${salonId}`;
   };
 
   const handleViewPage = () => {
