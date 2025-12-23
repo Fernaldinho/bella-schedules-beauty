@@ -11,12 +11,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/hooks/use-toast';
-import { Save, Store, Clock, Palette, Image, Share2, DollarSign, CalendarDays, Star, Globe, User, CreditCard, Loader2, ExternalLink } from 'lucide-react';
+import { Save, Store, Clock, Palette, Image, Share2, CalendarDays, Star, Globe, User, CreditCard, Loader2, ExternalLink } from 'lucide-react';
 import { ImageUploader } from '@/components/admin/ImageUploader';
-import { ThemeSelector } from '@/components/admin/ThemeSelector';
-import { ColorPicker } from '@/components/admin/ColorPicker';
+import { ThemeSelector, appearanceToCustomColors, computeColors, DEFAULT_APPEARANCE } from '@/components/admin/ThemeSelector';
 import { ClientPageLinks } from '@/components/admin/ClientPageLinks';
-import { ThemePreset, CustomColors, SocialMedia, SalonStats, ImageFormat } from '@/types/salon';
+import { SalonAppearance, SocialMedia, SalonStats, ImageFormat } from '@/types/salon';
 
 const WEEK_DAYS = [
   { id: 0, name: 'Domingo' },
@@ -28,13 +27,36 @@ const WEEK_DAYS = [
   { id: 6, name: 'Sábado' },
 ];
 
+// Apply theme to the DOM
+function applyThemeToDOM(appearance: SalonAppearance, priceColor?: string) {
+  const computed = computeColors(appearance);
+  const root = document.documentElement;
+
+  root.style.setProperty('--primary', computed.buttonBackground);
+  root.style.setProperty('--primary-foreground', computed.buttonText);
+  root.style.setProperty('--accent', computed.accent);
+  root.style.setProperty('--secondary', computed.gradientStart);
+
+  if (priceColor) {
+    root.style.setProperty('--price-color', priceColor);
+  }
+
+  const gradientPrimary = `linear-gradient(135deg, hsl(${computed.gradientStart}) 0%, hsl(${computed.gradientEnd}) 100%)`;
+  root.style.setProperty('--gradient-primary', gradientPrimary);
+  root.style.setProperty('--gradient-hero', gradientPrimary);
+
+  root.setAttribute('data-theme-loaded', 'true');
+  console.log('[THEME] Applied:', { appearance, computed });
+}
+
 export default function Settings() {
   const { salon, isLoading: salonLoading, updateSalon } = useSalonData();
   const { user, subscription: userSubscription, isLoading: userLoading } = useUserInfo();
   const { isActive, openBillingPortal, createCheckout } = useSubscription();
   const [isManaging, setIsManaging] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  
+
+  // Form data (non-appearance fields)
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -44,30 +66,20 @@ export default function Settings() {
     openingEnd: '18:00',
     logoUrl: '',
     logoFormat: 'square' as ImageFormat,
-    themePreset: 'purple' as ThemePreset,
-    customColors: { primary: '280 60% 50%', primaryForeground: '0 0% 100%', secondary: '320 70% 60%', accent: '340 80% 65%' } as CustomColors,
     priceColor: '142 76% 36%',
     socialMedia: { instagram: '', whatsapp: '', facebook: '', tiktok: '' } as SocialMedia,
     workingDays: [1, 2, 3, 4, 5, 6] as number[],
     stats: { rating: '4.9', clientCount: '+500', since: '2020' } as SalonStats,
   });
 
-  // Helper to ensure customColors has all required fields
-  const getCustomColors = (colors: any): CustomColors => {
-    const defaults = { primary: '280 60% 50%', primaryForeground: '0 0% 100%', secondary: '320 70% 60%', accent: '340 80% 65%' };
-    if (!colors) return defaults;
-    return {
-      primary: colors.primary || defaults.primary,
-      primaryForeground: colors.primaryForeground || defaults.primaryForeground,
-      secondary: colors.secondary || defaults.secondary,
-      accent: colors.accent || defaults.accent,
-    };
-  };
+  // Appearance states: saved (from DB), applied (active on page), draft is managed inside ThemeSelector
+  const [appearanceSaved, setAppearanceSaved] = useState<SalonAppearance | null>(null);
+  const [appearanceApplied, setAppearanceApplied] = useState<SalonAppearance>(DEFAULT_APPEARANCE);
 
   // Sync form data with salon data from Supabase
   useEffect(() => {
     if (salon) {
-      console.log('[SETTINGS] Sincronizando formulário com dados do Supabase');
+      console.log('[SETTINGS] Syncing form with Supabase data');
       setFormData({
         name: salon.name || '',
         description: salon.description || '',
@@ -77,22 +89,33 @@ export default function Settings() {
         openingEnd: salon.openingHours?.end || '18:00',
         logoUrl: salon.logoUrl || '',
         logoFormat: (salon.logoFormat as ImageFormat) || 'square',
-        themePreset: (salon.themePreset as ThemePreset) || 'purple',
-        customColors: getCustomColors(salon.customColors),
         priceColor: salon.priceColor || '142 76% 36%',
         socialMedia: salon.socialMedia || { instagram: '', whatsapp: '', facebook: '', tiktok: '' },
         workingDays: salon.workingDays || [1, 2, 3, 4, 5, 6],
         stats: salon.stats || { rating: '4.9', clientCount: '+500', since: '2020' },
       });
+
+      // Load appearance from database
+      const savedAppearance = salon.appearance as SalonAppearance | null;
+      if (savedAppearance) {
+        console.log('[SETTINGS] Loaded appearance from DB:', savedAppearance);
+        setAppearanceSaved(savedAppearance);
+        setAppearanceApplied(savedAppearance);
+        applyThemeToDOM(savedAppearance, salon.priceColor || undefined);
+      } else {
+        // No appearance saved, use default
+        setAppearanceSaved(null);
+        setAppearanceApplied(DEFAULT_APPEARANCE);
+        applyThemeToDOM(DEFAULT_APPEARANCE, salon.priceColor || undefined);
+      }
     }
   }, [salon]);
 
-  const handleThemeChange = (theme: ThemePreset) => {
-    setFormData({ ...formData, themePreset: theme });
-  };
-
-  const handleCustomColorsChange = (colors: CustomColors) => {
-    setFormData({ ...formData, customColors: colors });
+  // Handle "Apply" button from ThemeSelector
+  const handleApplyAppearance = (appearance: SalonAppearance) => {
+    console.log('[SETTINGS] Applying appearance:', appearance);
+    setAppearanceApplied(appearance);
+    applyThemeToDOM(appearance, formData.priceColor);
   };
 
   const handleWorkingDayToggle = (dayId: number) => {
@@ -122,7 +145,11 @@ export default function Settings() {
     e.preventDefault();
     setIsSaving(true);
     
-    console.log('[SETTINGS] Salvando configurações no Supabase...');
+    console.log('[SETTINGS] Saving to Supabase...');
+    console.log('[SETTINGS] Saving appearanceApplied:', appearanceApplied);
+
+    // Convert appearance to customColors for backwards compatibility
+    const customColors = appearanceToCustomColors(appearanceApplied);
     
     const success = await updateSalon({
       name: formData.name,
@@ -132,21 +159,23 @@ export default function Settings() {
       openingHours: { start: formData.openingStart, end: formData.openingEnd },
       logoUrl: formData.logoUrl,
       logoFormat: formData.logoFormat,
-      themePreset: formData.themePreset,
-      customColors: formData.customColors,
+      themePreset: 'custom',
+      customColors: customColors,
       priceColor: formData.priceColor,
       socialMedia: formData.socialMedia,
       workingDays: formData.workingDays,
       stats: formData.stats,
+      appearance: appearanceApplied,
     });
     
     setIsSaving(false);
     
     if (success) {
-      console.log('[SETTINGS] Configurações salvas com sucesso');
+      console.log('[SETTINGS] Saved successfully');
+      setAppearanceSaved(appearanceApplied);
       toast({ title: 'Configurações salvas com sucesso!' });
     } else {
-      console.error('[SETTINGS] Erro ao salvar configurações');
+      console.error('[SETTINGS] Error saving');
       toast({ 
         title: 'Erro ao salvar', 
         description: 'Não foi possível salvar as configurações.',
@@ -358,10 +387,8 @@ export default function Settings() {
                   <h2 className="font-display font-semibold text-lg text-foreground">Aparência do Salão</h2>
                 </div>
                 <ThemeSelector 
-                  currentTheme={formData.themePreset} 
-                  customColors={formData.customColors} 
-                  onThemeChange={handleThemeChange} 
-                  onCustomColorsChange={handleCustomColorsChange} 
+                  savedAppearance={appearanceSaved}
+                  onApply={handleApplyAppearance}
                 />
               </Card>
 
@@ -387,9 +414,19 @@ export default function Settings() {
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {WEEK_DAYS.map((day) => (
-                    <label key={day.id} className="flex items-center gap-2 p-3 rounded-lg border border-border hover:bg-secondary/50 cursor-pointer">
-                      <Checkbox checked={formData.workingDays.includes(day.id)} onCheckedChange={() => handleWorkingDayToggle(day.id)} />
-                      <span className="text-sm font-medium">{day.name}</span>
+                    <label
+                      key={day.id}
+                      className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                        formData.workingDays.includes(day.id)
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-primary/30'
+                      }`}
+                    >
+                      <Checkbox
+                        checked={formData.workingDays.includes(day.id)}
+                        onCheckedChange={() => handleWorkingDayToggle(day.id)}
+                      />
+                      <span className="text-sm font-medium text-foreground">{day.name}</span>
                     </label>
                   ))}
                 </div>
@@ -405,22 +442,18 @@ export default function Settings() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="openingStart">Abertura</Label>
-                    <Input type="time" id="openingStart" value={formData.openingStart} onChange={(e) => setFormData({ ...formData, openingStart: e.target.value })} className="input-elegant" />
+                    <Input id="openingStart" type="time" value={formData.openingStart} onChange={(e) => setFormData({ ...formData, openingStart: e.target.value })} className="input-elegant" />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="openingEnd">Fechamento</Label>
-                    <Input type="time" id="openingEnd" value={formData.openingEnd} onChange={(e) => setFormData({ ...formData, openingEnd: e.target.value })} className="input-elegant" />
+                    <Input id="openingEnd" type="time" value={formData.openingEnd} onChange={(e) => setFormData({ ...formData, openingEnd: e.target.value })} className="input-elegant" />
                   </div>
                 </div>
               </Card>
 
-              <Button type="submit" variant="gradient" size="lg" className="gap-2" disabled={isSaving}>
-                {isSaving ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Save className="w-4 h-4" />
-                )}
-                {isSaving ? 'Salvando...' : 'Salvar Configurações'}
+              <Button type="submit" variant="gradient" size="lg" className="w-full gap-2" disabled={isSaving}>
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Salvar Configurações
               </Button>
             </form>
           )}

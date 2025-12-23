@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { slugify } from '@/lib/slugUtils';
+import { SalonAppearance } from '@/types/salon';
 
 interface SalonData {
   id: string;
@@ -11,13 +12,14 @@ interface SalonData {
   logoUrl: string | null;
   logoFormat: string | null;
   themePreset: string | null;
-  customColors: { primary: string; secondary: string; accent: string } | null;
+  customColors: { primary: string; secondary: string; accent: string; primaryForeground?: string } | null;
   priceColor: string | null;
   socialMedia: { instagram: string; whatsapp: string; facebook: string; tiktok: string } | null;
   workingDays: number[] | null;
   openingHours: { start: string; end: string } | null;
   stats: { rating: string; clientCount: string; since: string } | null;
   slug: string | null;
+  appearance: SalonAppearance | null;
 }
 
 interface UseSalonDataReturn {
@@ -80,6 +82,7 @@ export function useSalonData(): UseSalonDataReturn {
         openingHours: data.opening_hours as SalonData['openingHours'],
         stats: data.stats as SalonData['stats'],
         slug: data.slug,
+        appearance: (data as any).appearance as SalonAppearance | null,
       };
 
       setSalon(salonData);
@@ -119,6 +122,7 @@ export function useSalonData(): UseSalonDataReturn {
     if (data.workingDays !== undefined) updateData.working_days = data.workingDays;
     if (data.openingHours !== undefined) updateData.opening_hours = data.openingHours;
     if (data.stats !== undefined) updateData.stats = data.stats;
+    if (data.appearance !== undefined) updateData.appearance = data.appearance;
 
     const { error: updateError } = await supabase
       .from('salons')
@@ -190,6 +194,7 @@ export function useSalonData(): UseSalonDataReturn {
             openingHours: newData.opening_hours as SalonData['openingHours'],
             stats: newData.stats as SalonData['stats'],
             slug: newData.slug as string | null,
+            appearance: newData.appearance as SalonAppearance | null,
           });
         }
       )
