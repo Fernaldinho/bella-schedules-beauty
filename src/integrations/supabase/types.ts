@@ -114,6 +114,7 @@ export type Database = {
           available_hours: Json | null
           created_at: string
           id: string
+          is_active: boolean
           name: string
           photo: string | null
           salon_id: string
@@ -125,6 +126,7 @@ export type Database = {
           available_hours?: Json | null
           created_at?: string
           id?: string
+          is_active?: boolean
           name: string
           photo?: string | null
           salon_id: string
@@ -136,6 +138,7 @@ export type Database = {
           available_hours?: Json | null
           created_at?: string
           id?: string
+          is_active?: boolean
           name?: string
           photo?: string | null
           salon_id?: string
@@ -192,6 +195,7 @@ export type Database = {
           owner_id: string
           price_color: string | null
           service_color: string | null
+          slug: string | null
           social_media: Json | null
           stats: Json | null
           theme_preset: string | null
@@ -212,6 +216,7 @@ export type Database = {
           owner_id: string
           price_color?: string | null
           service_color?: string | null
+          slug?: string | null
           social_media?: Json | null
           stats?: Json | null
           theme_preset?: string | null
@@ -232,6 +237,7 @@ export type Database = {
           owner_id?: string
           price_color?: string | null
           service_color?: string | null
+          slug?: string | null
           social_media?: Json | null
           stats?: Json | null
           theme_preset?: string | null
@@ -248,6 +254,7 @@ export type Database = {
           created_at: string
           duration: number
           id: string
+          is_active: boolean
           name: string
           price: number
           salon_id: string
@@ -258,6 +265,7 @@ export type Database = {
           created_at?: string
           duration?: number
           id?: string
+          is_active?: boolean
           name: string
           price?: number
           salon_id: string
@@ -268,6 +276,7 @@ export type Database = {
           created_at?: string
           duration?: number
           id?: string
+          is_active?: boolean
           name?: string
           price?: number
           salon_id?: string
