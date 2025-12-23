@@ -30,51 +30,42 @@ serve(async (req) => {
       throw new Error("User not authenticated");
     }
 
+    // Get subscription info
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+
+    const { data: subscription } = await supabaseAdmin
+      .from("subscriptions")
+      .select("stripe_customer_id")
+      .eq("user_id", user.id)
+      .single();
+
+    if (!subscription?.stripe_customer_id) {
+      throw new Error("No active subscription found");
+    }
+
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2023-10-16",
     });
 
-    // Check if customer exists
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
-    let customerId: string;
-
-    if (customers.data.length > 0) {
-      customerId = customers.data[0].id;
-    } else {
-      const customer = await stripe.customers.create({
-        email: user.email,
-        metadata: { supabase_user_id: user.id }
-      });
-      customerId = customer.id;
-    }
-
-    // Use the configured price ID
-    const priceId = "price_1SbFDcP29UxAYo1Io8zi8kAf";
-    
     const baseUrl = req.headers.get("origin") || "https://lovable.dev";
 
-    console.log("Creating checkout session for user:", user.id);
-    console.log("Price ID:", priceId);
-    console.log("Base URL:", baseUrl);
-
-    const session = await stripe.checkout.sessions.create({
-      customer: customerId,
-      payment_method_types: ["card"],
-      line_items: [{ price: priceId, quantity: 1 }],
-      mode: "subscription",
-      success_url: `${baseUrl}/admin?success=true`,
-      cancel_url: `${baseUrl}/admin?canceled=true`,
-      metadata: { supabase_user_id: user.id }
+    // Create Stripe billing portal session
+    const portalSession = await stripe.billingPortal.sessions.create({
+      customer: subscription.stripe_customer_id,
+      return_url: `${baseUrl}/admin/settings`,
     });
 
-    console.log("Checkout session created:", session.id);
+    console.log("Created billing portal session for user:", user.id);
 
-    return new Response(JSON.stringify({ url: session.url }), {
+    return new Response(JSON.stringify({ url: portalSession.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
   } catch (error: unknown) {
-    console.error("Error creating checkout session:", error);
+    console.error("Error creating portal session:", error);
     const message = error instanceof Error ? error.message : "Unknown error";
     return new Response(JSON.stringify({ error: message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

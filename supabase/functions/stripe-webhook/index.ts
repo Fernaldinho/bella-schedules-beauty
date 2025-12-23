@@ -36,13 +36,15 @@ serve(async (req) => {
         if (userId) {
           console.log("Activating subscription for user:", userId);
           
-          // Get subscription details
+          // Get subscription details from Stripe
           const subscription = await stripe.subscriptions.retrieve(subscriptionId);
           
+          // Update subscription in database - status to 'active'
           const { error } = await supabase
             .from("subscriptions")
             .update({
               status: "active",
+              plan: "pro",
               stripe_customer_id: customerId,
               stripe_subscription_id: subscriptionId,
               current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
@@ -53,7 +55,7 @@ serve(async (req) => {
           if (error) {
             console.error("Error updating subscription:", error);
           } else {
-            console.log("Subscription activated successfully");
+            console.log("Subscription activated successfully for user:", userId);
           }
         }
         break;
@@ -61,14 +63,17 @@ serve(async (req) => {
 
       case "customer.subscription.updated": {
         const subscription = event.data.object as Stripe.Subscription;
-        const customerId = subscription.customer as string;
-
+        
         console.log("Subscription updated:", subscription.id, "Status:", subscription.status);
+
+        // Determine the new status
+        const newStatus = subscription.status === "active" ? "active" : "inactive";
 
         const { error } = await supabase
           .from("subscriptions")
           .update({
-            status: subscription.status === "active" ? "active" : "inactive",
+            status: newStatus,
+            plan: newStatus === "active" ? "pro" : "free",
             current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
             updated_at: new Date().toISOString()
           })
@@ -76,6 +81,8 @@ serve(async (req) => {
 
         if (error) {
           console.error("Error updating subscription:", error);
+        } else {
+          console.log("Subscription updated to status:", newStatus);
         }
         break;
       }
@@ -89,12 +96,37 @@ serve(async (req) => {
           .from("subscriptions")
           .update({
             status: "cancelled",
+            plan: "free",
             updated_at: new Date().toISOString()
           })
           .eq("stripe_subscription_id", subscription.id);
 
         if (error) {
           console.error("Error updating subscription:", error);
+        } else {
+          console.log("Subscription cancelled successfully");
+        }
+        break;
+      }
+
+      case "invoice.payment_failed": {
+        const invoice = event.data.object as Stripe.Invoice;
+        const subscriptionId = invoice.subscription as string;
+
+        console.log("Payment failed for subscription:", subscriptionId);
+
+        if (subscriptionId) {
+          const { error } = await supabase
+            .from("subscriptions")
+            .update({
+              status: "past_due",
+              updated_at: new Date().toISOString()
+            })
+            .eq("stripe_subscription_id", subscriptionId);
+
+          if (error) {
+            console.error("Error updating subscription:", error);
+          }
         }
         break;
       }
