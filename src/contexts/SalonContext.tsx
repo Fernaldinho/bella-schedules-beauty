@@ -40,41 +40,49 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   const [salonId, setSalonId] = useState<string | null>(null);
 
   const applyTheme = (themePreset: ThemePreset, customColors?: CustomColors, priceColor?: string) => {
-    const presetThemes = {
+    const presetThemes: Record<string, { primary: string; secondary: string; accent: string }> = {
       purple: {
         primary: '270 70% 50%',
-        secondary: '320 70% 60%',
+        secondary: '280 60% 55%',
         accent: '330 80% 60%',
       },
       rose: {
         primary: '350 80% 55%',
-        secondary: '340 70% 65%',
+        secondary: '340 75% 60%',
         accent: '350 70% 70%',
       },
       gold: {
         primary: '45 90% 40%',
         secondary: '40 85% 50%',
-        accent: '45 90% 55%',
-      },
-      custom: customColors || {
-        primary: '280 60% 50%',
-        secondary: '320 70% 60%',
-        accent: '340 80% 65%',
+        accent: '50 90% 60%',
       },
     };
     
-    const colors = presetThemes[themePreset];
+    // Se for custom e tiver cores definidas, usar elas
+    const colors = themePreset === 'custom' && customColors
+      ? customColors
+      : presetThemes[themePreset] || presetThemes.purple;
     
-    document.documentElement.style.setProperty('--primary', colors.primary);
-    document.documentElement.style.setProperty('--primary-foreground', '0 0% 100%');
-    document.documentElement.style.setProperty('--accent', colors.accent);
+    const root = document.documentElement;
+    
+    root.style.setProperty('--primary', colors.primary);
+    root.style.setProperty('--primary-foreground', '0 0% 100%');
+    root.style.setProperty('--accent', colors.accent);
+    root.style.setProperty('--secondary', colors.secondary);
     
     if (priceColor) {
-      document.documentElement.style.setProperty('--price-color', priceColor);
+      root.style.setProperty('--price-color', priceColor);
     }
     
-    const gradientPrimary = `linear-gradient(135deg, hsl(${colors.primary}) 0%, hsl(${colors.secondary}) 50%, hsl(${colors.accent}) 100%)`;
-    document.documentElement.style.setProperty('--gradient-primary', gradientPrimary);
+    // Gradiente dinâmico (2 cores: secondary -> accent)
+    const gradientPrimary = `linear-gradient(135deg, hsl(${colors.secondary}) 0%, hsl(${colors.accent}) 100%)`;
+    root.style.setProperty('--gradient-primary', gradientPrimary);
+    root.style.setProperty('--gradient-hero', gradientPrimary);
+    
+    // Marcar que o tema foi aplicado (previne flash)
+    root.setAttribute('data-theme-loaded', 'true');
+    
+    console.log('[THEME-ADMIN] Tema aplicado:', { themePreset, colors, priceColor });
   };
 
   // Fetch all data from Supabase
