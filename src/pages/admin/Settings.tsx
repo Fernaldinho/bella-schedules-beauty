@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { SubscriptionGate } from '@/components/SubscriptionGate';
-import { useSalon } from '@/contexts/SalonContext';
+import { useSalonData } from '@/hooks/useSalonData';
 import { useUserInfo } from '@/hooks/useUserInfo';
 import { useSubscription } from '@/hooks/useSubscription';
 import { Card } from '@/components/ui/card';
@@ -16,7 +16,7 @@ import { ImageUploader } from '@/components/admin/ImageUploader';
 import { ThemeSelector } from '@/components/admin/ThemeSelector';
 import { ColorPicker } from '@/components/admin/ColorPicker';
 import { ClientPageLinks } from '@/components/admin/ClientPageLinks';
-import { ThemePreset, CustomColors, SocialMedia, SalonStats } from '@/types/salon';
+import { ThemePreset, CustomColors, SocialMedia, SalonStats, ImageFormat } from '@/types/salon';
 
 const WEEK_DAYS = [
   { id: 0, name: 'Domingo' },
@@ -29,46 +29,51 @@ const WEEK_DAYS = [
 ];
 
 export default function Settings() {
-  const { settings, updateSettings } = useSalon();
-  const { user, subscription: userSubscription, salon, isLoading: userLoading } = useUserInfo();
+  const { salon, isLoading: salonLoading, updateSalon } = useSalonData();
+  const { user, subscription: userSubscription, isLoading: userLoading } = useUserInfo();
   const { isActive, openBillingPortal, createCheckout } = useSubscription();
   const [isManaging, setIsManaging] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   
   const [formData, setFormData] = useState({
-    name: settings.name,
-    description: settings.description,
-    welcomeText: settings.welcomeText || '',
-    whatsapp: settings.whatsapp,
-    openingStart: settings.openingHours.start,
-    openingEnd: settings.openingHours.end,
-    logoUrl: settings.logoUrl,
-    logoFormat: settings.logoFormat,
-    themePreset: settings.themePreset,
-    customColors: settings.customColors || { primary: '280 60% 50%', secondary: '320 70% 60%', accent: '340 80% 65%' },
-    priceColor: settings.priceColor || '142 76% 36%',
-    socialMedia: settings.socialMedia || { instagram: '', whatsapp: '', facebook: '', tiktok: '' },
-    workingDays: settings.workingDays || [1, 2, 3, 4, 5, 6],
-    stats: settings.stats || { rating: '4.9', clientCount: '+500', since: '2020' },
+    name: '',
+    description: '',
+    welcomeText: '',
+    whatsapp: '',
+    openingStart: '09:00',
+    openingEnd: '18:00',
+    logoUrl: '',
+    logoFormat: 'square' as ImageFormat,
+    themePreset: 'purple' as ThemePreset,
+    customColors: { primary: '280 60% 50%', secondary: '320 70% 60%', accent: '340 80% 65%' } as CustomColors,
+    priceColor: '142 76% 36%',
+    socialMedia: { instagram: '', whatsapp: '', facebook: '', tiktok: '' } as SocialMedia,
+    workingDays: [1, 2, 3, 4, 5, 6] as number[],
+    stats: { rating: '4.9', clientCount: '+500', since: '2020' } as SalonStats,
   });
 
+  // Sync form data with salon data from Supabase
   useEffect(() => {
-    setFormData({
-      name: settings.name,
-      description: settings.description,
-      welcomeText: settings.welcomeText || '',
-      whatsapp: settings.whatsapp,
-      openingStart: settings.openingHours.start,
-      openingEnd: settings.openingHours.end,
-      logoUrl: settings.logoUrl,
-      logoFormat: settings.logoFormat,
-      themePreset: settings.themePreset,
-      customColors: settings.customColors || { primary: '280 60% 50%', secondary: '320 70% 60%', accent: '340 80% 65%' },
-      priceColor: settings.priceColor || '142 76% 36%',
-      socialMedia: settings.socialMedia || { instagram: '', whatsapp: '', facebook: '', tiktok: '' },
-      workingDays: settings.workingDays || [1, 2, 3, 4, 5, 6],
-      stats: settings.stats || { rating: '4.9', clientCount: '+500', since: '2020' },
-    });
-  }, [settings]);
+    if (salon) {
+      console.log('[SETTINGS] Sincronizando formulário com dados do Supabase');
+      setFormData({
+        name: salon.name || '',
+        description: salon.description || '',
+        welcomeText: salon.welcomeText || '',
+        whatsapp: salon.whatsapp || '',
+        openingStart: salon.openingHours?.start || '09:00',
+        openingEnd: salon.openingHours?.end || '18:00',
+        logoUrl: salon.logoUrl || '',
+        logoFormat: (salon.logoFormat as ImageFormat) || 'square',
+        themePreset: (salon.themePreset as ThemePreset) || 'purple',
+        customColors: salon.customColors || { primary: '280 60% 50%', secondary: '320 70% 60%', accent: '340 80% 65%' },
+        priceColor: salon.priceColor || '142 76% 36%',
+        socialMedia: salon.socialMedia || { instagram: '', whatsapp: '', facebook: '', tiktok: '' },
+        workingDays: salon.workingDays || [1, 2, 3, 4, 5, 6],
+        stats: salon.stats || { rating: '4.9', clientCount: '+500', since: '2020' },
+      });
+    }
+  }, [salon]);
 
   const handleThemeChange = (theme: ThemePreset) => {
     setFormData({ ...formData, themePreset: theme });
@@ -101,9 +106,13 @@ export default function Settings() {
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateSettings({
+    setIsSaving(true);
+    
+    console.log('[SETTINGS] Salvando configurações no Supabase...');
+    
+    const success = await updateSalon({
       name: formData.name,
       description: formData.description,
       welcomeText: formData.welcomeText,
@@ -118,7 +127,20 @@ export default function Settings() {
       workingDays: formData.workingDays,
       stats: formData.stats,
     });
-    toast({ title: 'Configurações salvas com sucesso!' });
+    
+    setIsSaving(false);
+    
+    if (success) {
+      console.log('[SETTINGS] Configurações salvas com sucesso');
+      toast({ title: 'Configurações salvas com sucesso!' });
+    } else {
+      console.error('[SETTINGS] Erro ao salvar configurações');
+      toast({ 
+        title: 'Erro ao salvar', 
+        description: 'Não foi possível salvar as configurações.',
+        variant: 'destructive' 
+      });
+    }
   };
 
   const handleManageSubscription = async () => {
@@ -144,6 +166,8 @@ export default function Settings() {
     if (!dateStr) return '-';
     return new Date(dateStr).toLocaleDateString('pt-BR');
   };
+
+  const isPageLoading = salonLoading || userLoading;
 
   return (
     <AdminLayout>
@@ -251,129 +275,148 @@ export default function Settings() {
         </Card>
 
         <SubscriptionGate fallbackMessage="Assine o plano PRO para acessar as configurações.">
-          <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl">
-            <Card className="p-6 border-0 shadow-card">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center">
-                  <Store className="w-5 h-5 text-primary-foreground" />
+          {isPageLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl">
+              <Card className="p-6 border-0 shadow-card">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center">
+                    <Store className="w-5 h-5 text-primary-foreground" />
+                  </div>
+                  <h2 className="font-display font-semibold text-lg text-foreground">Informações do Salão</h2>
                 </div>
-                <h2 className="font-display font-semibold text-lg text-foreground">Informações do Salão</h2>
-              </div>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Nome do Salão</Label>
-                  <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="input-elegant" />
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Nome do Salão</Label>
+                    <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="input-elegant" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Descrição</Label>
+                    <Textarea id="description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="input-elegant resize-none" rows={2} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="welcomeText">Texto de Boas-vindas</Label>
+                    <Textarea id="welcomeText" value={formData.welcomeText} onChange={(e) => setFormData({ ...formData, welcomeText: e.target.value })} className="input-elegant resize-none" rows={2} placeholder="Agende seu momento de beleza 💖" />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Descrição</Label>
-                  <Textarea id="description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="input-elegant resize-none" rows={2} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="welcomeText">Texto de Boas-vindas</Label>
-                  <Textarea id="welcomeText" value={formData.welcomeText} onChange={(e) => setFormData({ ...formData, welcomeText: e.target.value })} className="input-elegant resize-none" rows={2} placeholder="Agende seu momento de beleza 💖" />
-                </div>
-              </div>
-            </Card>
+              </Card>
 
-            <Card className="p-6 border-0 shadow-card">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center">
-                  <Image className="w-5 h-5 text-primary-foreground" />
+              <Card className="p-6 border-0 shadow-card">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center">
+                    <Image className="w-5 h-5 text-primary-foreground" />
+                  </div>
+                  <h2 className="font-display font-semibold text-lg text-foreground">Logotipo</h2>
                 </div>
-                <h2 className="font-display font-semibold text-lg text-foreground">Logotipo</h2>
-              </div>
-              <ImageUploader label="Logo do Salão" currentUrl={formData.logoUrl} format={formData.logoFormat} onUrlChange={(url) => setFormData({ ...formData, logoUrl: url })} onFormatChange={(format) => setFormData({ ...formData, logoFormat: format })} />
-            </Card>
+                <ImageUploader label="Logo do Salão" currentUrl={formData.logoUrl} format={formData.logoFormat} onUrlChange={(url) => setFormData({ ...formData, logoUrl: url })} onFormatChange={(format) => setFormData({ ...formData, logoFormat: format })} />
+              </Card>
 
-            <Card className="p-6 border-0 shadow-card">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center">
-                  <Star className="w-5 h-5 text-primary-foreground" />
+              <Card className="p-6 border-0 shadow-card">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center">
+                    <Star className="w-5 h-5 text-primary-foreground" />
+                  </div>
+                  <h2 className="font-display font-semibold text-lg text-foreground">Estatísticas do Salão</h2>
                 </div>
-                <h2 className="font-display font-semibold text-lg text-foreground">Estatísticas do Salão</h2>
-              </div>
-              <p className="text-sm text-muted-foreground mb-4">Esses dados aparecem na página inicial do cliente.</p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>Avaliação (estrelas)</Label>
-                  <Input value={formData.stats.rating} onChange={(e) => handleStatsChange('rating', e.target.value)} placeholder="4.9" className="input-elegant" />
+                <p className="text-sm text-muted-foreground mb-4">Esses dados aparecem na página inicial do cliente.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label>Avaliação (estrelas)</Label>
+                    <Input value={formData.stats.rating} onChange={(e) => handleStatsChange('rating', e.target.value)} placeholder="4.9" className="input-elegant" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Clientes satisfeitos</Label>
+                    <Input value={formData.stats.clientCount} onChange={(e) => handleStatsChange('clientCount', e.target.value)} placeholder="+500" className="input-elegant" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Desde quando</Label>
+                    <Input value={formData.stats.since} onChange={(e) => handleStatsChange('since', e.target.value)} placeholder="2020" className="input-elegant" />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Clientes satisfeitos</Label>
-                  <Input value={formData.stats.clientCount} onChange={(e) => handleStatsChange('clientCount', e.target.value)} placeholder="+500" className="input-elegant" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Desde quando</Label>
-                  <Input value={formData.stats.since} onChange={(e) => handleStatsChange('since', e.target.value)} placeholder="2020" className="input-elegant" />
-                </div>
-              </div>
-            </Card>
+              </Card>
 
-            <Card className="p-6 border-0 shadow-card">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center">
-                  <Palette className="w-5 h-5 text-primary-foreground" />
+              <Card className="p-6 border-0 shadow-card">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center">
+                    <Palette className="w-5 h-5 text-primary-foreground" />
+                  </div>
+                  <h2 className="font-display font-semibold text-lg text-foreground">Tema Visual</h2>
                 </div>
-                <h2 className="font-display font-semibold text-lg text-foreground">Tema Visual</h2>
-              </div>
-              <ThemeSelector currentTheme={formData.themePreset} customColors={formData.customColors} onThemeChange={handleThemeChange} onCustomColorsChange={handleCustomColorsChange} />
-            </Card>
+                <ThemeSelector currentTheme={formData.themePreset} customColors={formData.customColors} onThemeChange={handleThemeChange} onCustomColorsChange={handleCustomColorsChange} />
+              </Card>
 
-            <Card className="p-6 border-0 shadow-card">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center">
-                  <DollarSign className="w-5 h-5 text-primary-foreground" />
+              <Card className="p-6 border-0 shadow-card">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center">
+                    <DollarSign className="w-5 h-5 text-primary-foreground" />
+                  </div>
+                  <h2 className="font-display font-semibold text-lg text-foreground">Cor dos Preços</h2>
                 </div>
-                <h2 className="font-display font-semibold text-lg text-foreground">Cor dos Preços</h2>
-              </div>
-              <ColorPicker label="Cor para valores" value={formData.priceColor} onChange={(value) => setFormData({ ...formData, priceColor: value })} description="Aplicada nos preços exibidos." />
-            </Card>
+                <ColorPicker label="Cor para valores" value={formData.priceColor} onChange={(value) => setFormData({ ...formData, priceColor: value })} description="Aplicada nos preços exibidos." />
+              </Card>
 
-            <Card className="p-6 border-0 shadow-card">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center">
-                  <Share2 className="w-5 h-5 text-primary-foreground" />
+              <Card className="p-6 border-0 shadow-card">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center">
+                    <Share2 className="w-5 h-5 text-primary-foreground" />
+                  </div>
+                  <h2 className="font-display font-semibold text-lg text-foreground">Redes Sociais</h2>
                 </div>
-                <h2 className="font-display font-semibold text-lg text-foreground">Redes Sociais</h2>
-              </div>
-              <div className="space-y-4">
-                <div className="space-y-2"><Label>Instagram</Label><Input value={formData.socialMedia.instagram} onChange={(e) => handleSocialMediaChange('instagram', e.target.value)} placeholder="@seusalao" className="input-elegant" /></div>
-                <div className="space-y-2"><Label>WhatsApp</Label><Input value={formData.socialMedia.whatsapp} onChange={(e) => handleSocialMediaChange('whatsapp', e.target.value.replace(/\D/g, ''))} placeholder="5511999999999" className="input-elegant" /></div>
-              </div>
-            </Card>
-
-            <Card className="p-6 border-0 shadow-card">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center">
-                  <CalendarDays className="w-5 h-5 text-primary-foreground" />
+                <div className="space-y-4">
+                  <div className="space-y-2"><Label>Instagram</Label><Input value={formData.socialMedia.instagram} onChange={(e) => handleSocialMediaChange('instagram', e.target.value)} placeholder="@seusalao" className="input-elegant" /></div>
+                  <div className="space-y-2"><Label>WhatsApp</Label><Input value={formData.socialMedia.whatsapp} onChange={(e) => handleSocialMediaChange('whatsapp', e.target.value.replace(/\D/g, ''))} placeholder="5511999999999" className="input-elegant" /></div>
                 </div>
-                <h2 className="font-display font-semibold text-lg text-foreground">Dias de Funcionamento</h2>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {WEEK_DAYS.map((day) => (
-                  <label key={day.id} className="flex items-center gap-2 p-3 rounded-lg border border-border hover:bg-secondary/50 cursor-pointer">
-                    <Checkbox checked={formData.workingDays.includes(day.id)} onCheckedChange={() => handleWorkingDayToggle(day.id)} />
-                    <span className="text-sm font-medium">{day.name}</span>
-                  </label>
-                ))}
-              </div>
-            </Card>
+              </Card>
 
-            <Card className="p-6 border-0 shadow-card">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center">
-                  <Clock className="w-5 h-5 text-primary-foreground" />
+              <Card className="p-6 border-0 shadow-card">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center">
+                    <CalendarDays className="w-5 h-5 text-primary-foreground" />
+                  </div>
+                  <h2 className="font-display font-semibold text-lg text-foreground">Dias de Funcionamento</h2>
                 </div>
-                <h2 className="font-display font-semibold text-lg text-foreground">Horário de Funcionamento</h2>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2"><Label>Abertura</Label><Input type="time" value={formData.openingStart} onChange={(e) => setFormData({ ...formData, openingStart: e.target.value })} className="input-elegant" /></div>
-                <div className="space-y-2"><Label>Fechamento</Label><Input type="time" value={formData.openingEnd} onChange={(e) => setFormData({ ...formData, openingEnd: e.target.value })} className="input-elegant" /></div>
-              </div>
-            </Card>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {WEEK_DAYS.map((day) => (
+                    <label key={day.id} className="flex items-center gap-2 p-3 rounded-lg border border-border hover:bg-secondary/50 cursor-pointer">
+                      <Checkbox checked={formData.workingDays.includes(day.id)} onCheckedChange={() => handleWorkingDayToggle(day.id)} />
+                      <span className="text-sm font-medium">{day.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </Card>
 
-            <Button type="submit" variant="gradient" size="lg" className="gap-2"><Save className="w-4 h-4" />Salvar Configurações</Button>
-          </form>
+              <Card className="p-6 border-0 shadow-card">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center">
+                    <Clock className="w-5 h-5 text-primary-foreground" />
+                  </div>
+                  <h2 className="font-display font-semibold text-lg text-foreground">Horário de Funcionamento</h2>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="openingStart">Abertura</Label>
+                    <Input type="time" id="openingStart" value={formData.openingStart} onChange={(e) => setFormData({ ...formData, openingStart: e.target.value })} className="input-elegant" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="openingEnd">Fechamento</Label>
+                    <Input type="time" id="openingEnd" value={formData.openingEnd} onChange={(e) => setFormData({ ...formData, openingEnd: e.target.value })} className="input-elegant" />
+                  </div>
+                </div>
+              </Card>
+
+              <Button type="submit" variant="gradient" size="lg" className="gap-2" disabled={isSaving}>
+                {isSaving ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4" />
+                )}
+                {isSaving ? 'Salvando...' : 'Salvar Configurações'}
+              </Button>
+            </form>
+          )}
         </SubscriptionGate>
       </div>
     </AdminLayout>

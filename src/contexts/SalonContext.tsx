@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Professional, Service, Appointment, SalonSettings, Client, ThemePreset, CustomColors } from '@/types/salon';
 import { professionals as defaultProfessionals, services as defaultServices, sampleAppointments, defaultSalonSettings } from '@/data/salonData';
 import { getDayOfWeekFromDateString } from '@/lib/dateUtils';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SalonContextType {
   professionals: Professional[];
@@ -9,6 +10,7 @@ interface SalonContextType {
   appointments: Appointment[];
   clients: Client[];
   settings: SalonSettings;
+  isLoading: boolean;
   
   // Actions
   addAppointment: (appointment: Omit<Appointment, 'id' | 'createdAt'>) => void;
@@ -23,6 +25,7 @@ interface SalonContextType {
   getAvailableSlots: (professionalId: string, date: string) => string[];
   isSlotBooked: (professionalId: string, date: string, time: string) => boolean;
   getProfessionalsForService: (serviceId: string) => Professional[];
+  refetchData: () => Promise<void>;
 }
 
 const SalonContext = createContext<SalonContextType | undefined>(undefined);
@@ -33,6 +36,8 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   const [appointments, setAppointments] = useState<Appointment[]>(sampleAppointments);
   const [clients, setClients] = useState<Client[]>([]);
   const [settings, setSettings] = useState<SalonSettings>(defaultSalonSettings);
+  const [isLoading, setIsLoading] = useState(true);
+  const [salonId, setSalonId] = useState<string | null>(null);
 
   const applyTheme = (themePreset: ThemePreset, customColors?: CustomColors, priceColor?: string) => {
     const presetThemes = {
@@ -64,58 +69,227 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.style.setProperty('--primary-foreground', '0 0% 100%');
     document.documentElement.style.setProperty('--accent', colors.accent);
     
-    // Apply price color
     if (priceColor) {
       document.documentElement.style.setProperty('--price-color', priceColor);
     }
     
-    // Update gradient
     const gradientPrimary = `linear-gradient(135deg, hsl(${colors.primary}) 0%, hsl(${colors.secondary}) 50%, hsl(${colors.accent}) 100%)`;
     document.documentElement.style.setProperty('--gradient-primary', gradientPrimary);
   };
 
-  // Load from localStorage
-  useEffect(() => {
-    const savedAppointments = localStorage.getItem('salon_appointments');
-    if (savedAppointments) {
-      setAppointments(JSON.parse(savedAppointments));
-    }
+  // Fetch all data from Supabase
+  const fetchAllData = useCallback(async () => {
+    console.log('[CONTEXT] Buscando dados do Supabase...');
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        console.log('[CONTEXT] Sem sessão, usando dados padrão');
+        setIsLoading(false);
+        return;
+      }
 
-    const savedSettings = localStorage.getItem('salon_settings');
-    if (savedSettings) {
-      const parsedSettings = JSON.parse(savedSettings);
-      // Merge with defaults to ensure all new fields exist
-      const mergedSettings = { ...defaultSalonSettings, ...parsedSettings };
-      setSettings(mergedSettings);
-      applyTheme(mergedSettings.themePreset, mergedSettings.customColors, mergedSettings.priceColor);
-    }
+      // Fetch salon
+      const { data: salonData, error: salonError } = await supabase
+        .from('salons')
+        .select('*')
+        .eq('owner_id', session.user.id)
+        .single();
 
-    const savedProfessionals = localStorage.getItem('salon_professionals');
-    if (savedProfessionals) {
-      setProfessionals(JSON.parse(savedProfessionals));
-    }
+      if (salonError) {
+        console.error('[CONTEXT] Erro ao buscar salão:', salonError);
+        setIsLoading(false);
+        return;
+      }
 
-    const savedServices = localStorage.getItem('salon_services');
-    if (savedServices) {
-      setServices(JSON.parse(savedServices));
+      setSalonId(salonData.id);
+      console.log('[CONTEXT] Salão encontrado:', salonData.id);
+
+      // Update settings from Supabase
+      const newSettings: SalonSettings = {
+        name: salonData.name || defaultSalonSettings.name,
+        description: salonData.description || defaultSalonSettings.description,
+        welcomeText: salonData.welcome_text || defaultSalonSettings.welcomeText,
+        whatsapp: salonData.whatsapp || defaultSalonSettings.whatsapp,
+        coverPhoto: defaultSalonSettings.coverPhoto,
+        logoUrl: salonData.logo_url || defaultSalonSettings.logoUrl,
+        logoFormat: (salonData.logo_format as SalonSettings['logoFormat']) || defaultSalonSettings.logoFormat,
+        themePreset: (salonData.theme_preset as ThemePreset) || defaultSalonSettings.themePreset,
+        customColors: (salonData.custom_colors as unknown as CustomColors) || defaultSalonSettings.customColors,
+        priceColor: salonData.price_color || defaultSalonSettings.priceColor,
+        socialMedia: (salonData.social_media as unknown as SalonSettings['socialMedia']) || defaultSalonSettings.socialMedia,
+        openingHours: (salonData.opening_hours as unknown as SalonSettings['openingHours']) || defaultSalonSettings.openingHours,
+        workingDays: salonData.working_days || defaultSalonSettings.workingDays,
+        stats: (salonData.stats as unknown as SalonSettings['stats']) || defaultSalonSettings.stats,
+      };
+      
+      setSettings(newSettings);
+      applyTheme(newSettings.themePreset, newSettings.customColors, newSettings.priceColor);
+
+      // Fetch professionals
+      const { data: profData } = await supabase
+        .from('professionals')
+        .select('*')
+        .eq('salon_id', salonData.id)
+        .eq('is_active', true);
+
+      if (profData && profData.length > 0) {
+        console.log('[CONTEXT] Profissionais carregados:', profData.length);
+        const mappedProfs: Professional[] = profData.map(p => ({
+          id: p.id,
+          name: p.name,
+          specialty: p.specialty || '',
+          photo: p.photo || '',
+          services: [],
+          availableDays: p.available_days || [1, 2, 3, 4, 5, 6],
+          availableHours: (p.available_hours as { start: string; end: string }) || { start: '09:00', end: '18:00' },
+        }));
+        setProfessionals(mappedProfs);
+      }
+
+      // Fetch services
+      const { data: servData } = await supabase
+        .from('services')
+        .select('*')
+        .eq('salon_id', salonData.id)
+        .eq('is_active', true);
+
+      if (servData && servData.length > 0) {
+        console.log('[CONTEXT] Serviços carregados:', servData.length);
+        const mappedServices: Service[] = servData.map(s => ({
+          id: s.id,
+          name: s.name,
+          price: Number(s.price),
+          duration: s.duration,
+          professionalId: '',
+          category: s.category || 'Geral',
+        }));
+        setServices(mappedServices);
+      }
+
+      // Fetch appointments
+      const { data: aptData } = await supabase
+        .from('appointments')
+        .select('*')
+        .eq('salon_id', salonData.id);
+
+      if (aptData && aptData.length > 0) {
+        console.log('[CONTEXT] Agendamentos carregados:', aptData.length);
+        const mappedApts: Appointment[] = aptData.map(a => ({
+          id: a.id,
+          clientName: a.client_name,
+          clientPhone: a.client_phone,
+          serviceId: a.service_id || '',
+          professionalId: a.professional_id || '',
+          date: a.date,
+          time: a.time,
+          status: a.status as Appointment['status'],
+          createdAt: a.created_at,
+        }));
+        setAppointments(mappedApts);
+      }
+
+    } catch (err) {
+      console.error('[CONTEXT] Erro ao buscar dados:', err);
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
+  // Initial load
   useEffect(() => {
-    localStorage.setItem('salon_appointments', JSON.stringify(appointments));
-  }, [appointments]);
+    fetchAllData();
+  }, [fetchAllData]);
 
+  // Auth state change
   useEffect(() => {
-    localStorage.setItem('salon_settings', JSON.stringify(settings));
-  }, [settings]);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      console.log('[CONTEXT] Auth mudou, recarregando...');
+      fetchAllData();
+    });
 
-  useEffect(() => {
-    localStorage.setItem('salon_professionals', JSON.stringify(professionals));
-  }, [professionals]);
+    return () => subscription.unsubscribe();
+  }, [fetchAllData]);
 
+  // Realtime subscription for salon updates
   useEffect(() => {
-    localStorage.setItem('salon_services', JSON.stringify(services));
-  }, [services]);
+    if (!salonId) return;
+
+    console.log('[CONTEXT-REALTIME] Inscrevendo para salão:', salonId);
+
+    const channel = supabase
+      .channel(`salon-context-${salonId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'salons',
+          filter: `id=eq.${salonId}`,
+        },
+        (payload) => {
+          console.log('[CONTEXT-REALTIME] Salão atualizado');
+          fetchAllData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'professionals',
+          filter: `salon_id=eq.${salonId}`,
+        },
+        () => {
+          console.log('[CONTEXT-REALTIME] Profissionais atualizados');
+          fetchAllData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'services',
+          filter: `salon_id=eq.${salonId}`,
+        },
+        () => {
+          console.log('[CONTEXT-REALTIME] Serviços atualizados');
+          fetchAllData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'appointments',
+          filter: `salon_id=eq.${salonId}`,
+        },
+        () => {
+          console.log('[CONTEXT-REALTIME] Agendamentos atualizados');
+          fetchAllData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('[CONTEXT-REALTIME] Removendo inscrição');
+      supabase.removeChannel(channel);
+    };
+  }, [salonId, fetchAllData]);
+
+  // Window focus refetch
+  useEffect(() => {
+    const handleFocus = () => {
+      console.log('[CONTEXT] Janela focada, revalidando...');
+      fetchAllData();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [fetchAllData]);
 
   const generateTimeSlots = (start: string, end: string, intervalMinutes: number = 30): string[] => {
     const slots: string[] = [];
@@ -152,19 +326,14 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
     
     const dayOfWeek = getDayOfWeekFromDateString(date);
     
-    // Check if day is a working day for the salon
     if (!settings.workingDays.includes(dayOfWeek)) return [];
-    
-    // Check if professional works on this day
     if (!professional.availableDays.includes(dayOfWeek)) return [];
     
-    // Get professional's hours but constrain to salon opening hours
     const profStart = professional.availableHours.start;
     const profEnd = professional.availableHours.end;
     const salonStart = settings.openingHours.start;
     const salonEnd = settings.openingHours.end;
     
-    // Use the later start time and earlier end time
     const effectiveStart = profStart > salonStart ? profStart : salonStart;
     const effectiveEnd = profEnd < salonEnd ? profEnd : salonEnd;
     
@@ -189,7 +358,6 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
     };
     setAppointments(prev => [...prev, newAppointment]);
 
-    // Update or create client
     const existingClient = clients.find(c => c.phone === appointment.clientPhone);
     if (existingClient) {
       setClients(prev => prev.map(c => 
@@ -250,7 +418,6 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-
   return (
     <SalonContext.Provider value={{
       professionals,
@@ -258,6 +425,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
       appointments,
       clients,
       settings,
+      isLoading,
       addAppointment,
       cancelAppointment,
       addService,
@@ -270,6 +438,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
       getAvailableSlots,
       isSlotBooked,
       getProfessionalsForService,
+      refetchData: fetchAllData,
     }}>
       {children}
     </SalonContext.Provider>
