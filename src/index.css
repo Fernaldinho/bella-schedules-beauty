@@ -151,15 +151,10 @@
   }
 
   /* Previne flash de cores durante carregamento */
-  :root:not([data-theme-loaded="true"]) .gradient-primary,
-  :root:not([data-theme-loaded="true"]) .gradient-hero {
-    opacity: 0;
-    transition: opacity 0.2s ease-in-out;
-  }
-
-  :root[data-theme-loaded="true"] .gradient-primary,
-  :root[data-theme-loaded="true"] .gradient-hero {
+  .gradient-primary,
+  .gradient-hero {
     opacity: 1;
+    transition: opacity 0.2s ease-in-out;
   }
 }
 
