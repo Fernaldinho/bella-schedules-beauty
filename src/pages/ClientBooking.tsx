@@ -39,6 +39,7 @@ interface SalonData {
   opening_hours: { start: string; end: string };
   working_days: number[];
   stats: { rating: string; clientCount: string; since: string };
+  whatsapp: string;
 }
 
 interface Professional {
@@ -149,10 +150,26 @@ export default function ClientBooking() {
 
   const applyTheme = (salonData: SalonData) => {
     const colors = salonData.custom_colors || { primary: '270 70% 50%', secondary: '320 70% 60%', accent: '330 80% 60%' };
+    
+    console.log('[THEME] Aplicando cores personalizadas:', colors);
+    
+    // Aplicar cores CSS
     document.documentElement.style.setProperty('--primary', colors.primary);
     document.documentElement.style.setProperty('--accent', colors.accent);
+    document.documentElement.style.setProperty('--secondary', colors.secondary);
+    
+    // Gradientes dinâmicos
     const gradient = `linear-gradient(135deg, hsl(${colors.primary}) 0%, hsl(${colors.secondary}) 50%, hsl(${colors.accent}) 100%)`;
     document.documentElement.style.setProperty('--gradient-primary', gradient);
+    document.documentElement.style.setProperty('--gradient-hero', gradient);
+    
+    // Cores de preço e serviço (se configuradas)
+    if (salonData.price_color) {
+      document.documentElement.style.setProperty('--price-color', salonData.price_color);
+    }
+    if (salonData.service_color) {
+      document.documentElement.style.setProperty('--service-color', salonData.service_color);
+    }
   };
 
   const loadSalonData = async () => {
@@ -269,6 +286,36 @@ export default function ClientBooking() {
 
   const formatPrice = (price: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(price);
   const formatDuration = (mins: number) => mins < 60 ? `${mins}min` : `${Math.floor(mins/60)}h${mins%60 > 0 ? ` ${mins%60}min` : ''}`;
+  const formatDateBR = (date: Date) => format(date, "dd/MM/yyyy", { locale: ptBR });
+
+  const handleWhatsAppRedirect = () => {
+    if (!salon || !selectedProfessional || !selectedService || !selectedDate || !selectedTime) return;
+    
+    const whatsappNumber = salon.whatsapp || salon.social_media?.whatsapp || '';
+    if (!whatsappNumber) {
+      console.log('[WHATSAPP] Número não configurado');
+      return;
+    }
+    
+    const cleanNumber = whatsappNumber.replace(/\D/g, '');
+    const fullNumber = cleanNumber.startsWith('55') ? cleanNumber : `55${cleanNumber}`;
+    
+    const message = encodeURIComponent(
+      `✨ *Agendamento Confirmado - ${salon.name}*\n\n` +
+      `👤 Cliente: ${clientName}\n` +
+      `💇 Serviço: ${selectedService.name}\n` +
+      `👩 Profissional: ${selectedProfessional.name}\n` +
+      `📅 Data: ${formatDateBR(selectedDate)}\n` +
+      `🕐 Horário: ${selectedTime}\n` +
+      `💰 Valor: ${formatPrice(selectedService.price)}\n\n` +
+      `Obrigado por agendar conosco! 💖`
+    );
+    
+    const whatsappUrl = `https://wa.me/${fullNumber}?text=${message}`;
+    console.log('[WHATSAPP] Redirecionando para:', whatsappUrl);
+    
+    window.open(whatsappUrl, '_blank');
+  };
 
   const handleSubmit = async () => {
     if (!selectedProfessional || !selectedService || !selectedDate || !selectedTime || !clientName || !clientPhone || !salon) return;
@@ -369,6 +416,8 @@ export default function ClientBooking() {
 
   // Success Step
   if (step === 'success') {
+    const hasWhatsApp = !!(salon.whatsapp || salon.social_media?.whatsapp);
+    
     return (
       <div className="min-h-screen bg-background">
         <BookingHeader />
@@ -405,10 +454,19 @@ export default function ClientBooking() {
               </div>
             </Card>
 
-            <Button variant="gradient" size="lg" onClick={resetBooking} className="gap-2">
-              <Home className="w-4 h-4" />
-              Voltar ao Início
-            </Button>
+            <div className="space-y-3">
+              {hasWhatsApp && (
+                <Button variant="hero" size="lg" onClick={handleWhatsAppRedirect} className="gap-2 w-full">
+                  <MessageCircle className="w-5 h-5" />
+                  Confirmar via WhatsApp
+                </Button>
+              )}
+              
+              <Button variant={hasWhatsApp ? "secondary" : "gradient"} size="lg" onClick={resetBooking} className="gap-2 w-full">
+                <Home className="w-4 h-4" />
+                Fazer Novo Agendamento
+              </Button>
+            </div>
           </div>
         </main>
       </div>
