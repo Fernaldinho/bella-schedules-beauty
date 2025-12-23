@@ -22,7 +22,9 @@ serve(async (req) => {
 
   try {
     const body = await req.text();
-    const event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+    
+    // Use constructEventAsync instead of constructEvent for Deno compatibility
+    const event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
 
     console.log("Webhook event received:", event.type);
 
@@ -33,6 +35,8 @@ serve(async (req) => {
         const customerId = session.customer as string;
         const subscriptionId = session.subscription as string;
 
+        console.log("checkout.session.completed - userId:", userId, "customerId:", customerId, "subscriptionId:", subscriptionId);
+
         if (userId) {
           console.log("Activating subscription for user:", userId);
           
@@ -40,7 +44,7 @@ serve(async (req) => {
           const subscription = await stripe.subscriptions.retrieve(subscriptionId);
           
           // Update subscription in database - status to 'active'
-          const { error } = await supabase
+          const { data, error } = await supabase
             .from("subscriptions")
             .update({
               status: "active",
@@ -48,15 +52,20 @@ serve(async (req) => {
               stripe_customer_id: customerId,
               stripe_subscription_id: subscriptionId,
               current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+              last_webhook_event: "checkout.session.completed",
+              last_webhook_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
             })
-            .eq("user_id", userId);
+            .eq("user_id", userId)
+            .select();
 
           if (error) {
             console.error("Error updating subscription:", error);
           } else {
-            console.log("Subscription activated successfully for user:", userId);
+            console.log("Subscription activated successfully for user:", userId, "data:", data);
           }
+        } else {
+          console.error("No user_id found in session metadata");
         }
         break;
       }
@@ -69,20 +78,23 @@ serve(async (req) => {
         // Determine the new status
         const newStatus = subscription.status === "active" ? "active" : "inactive";
 
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from("subscriptions")
           .update({
             status: newStatus,
             plan: newStatus === "active" ? "pro" : "free",
             current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+            last_webhook_event: "customer.subscription.updated",
+            last_webhook_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           })
-          .eq("stripe_subscription_id", subscription.id);
+          .eq("stripe_subscription_id", subscription.id)
+          .select();
 
         if (error) {
           console.error("Error updating subscription:", error);
         } else {
-          console.log("Subscription updated to status:", newStatus);
+          console.log("Subscription updated to status:", newStatus, "data:", data);
         }
         break;
       }
@@ -92,19 +104,22 @@ serve(async (req) => {
 
         console.log("Subscription cancelled:", subscription.id);
 
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from("subscriptions")
           .update({
             status: "cancelled",
             plan: "free",
+            last_webhook_event: "customer.subscription.deleted",
+            last_webhook_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           })
-          .eq("stripe_subscription_id", subscription.id);
+          .eq("stripe_subscription_id", subscription.id)
+          .select();
 
         if (error) {
           console.error("Error updating subscription:", error);
         } else {
-          console.log("Subscription cancelled successfully");
+          console.log("Subscription cancelled successfully, data:", data);
         }
         break;
       }
@@ -116,16 +131,49 @@ serve(async (req) => {
         console.log("Payment failed for subscription:", subscriptionId);
 
         if (subscriptionId) {
-          const { error } = await supabase
+          const { data, error } = await supabase
             .from("subscriptions")
             .update({
               status: "past_due",
+              last_webhook_event: "invoice.payment_failed",
+              last_webhook_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
             })
-            .eq("stripe_subscription_id", subscriptionId);
+            .eq("stripe_subscription_id", subscriptionId)
+            .select();
 
           if (error) {
             console.error("Error updating subscription:", error);
+          } else {
+            console.log("Subscription marked as past_due, data:", data);
+          }
+        }
+        break;
+      }
+
+      case "invoice.paid": {
+        const invoice = event.data.object as Stripe.Invoice;
+        const subscriptionId = invoice.subscription as string;
+
+        console.log("Invoice paid for subscription:", subscriptionId);
+
+        if (subscriptionId) {
+          const { data, error } = await supabase
+            .from("subscriptions")
+            .update({
+              status: "active",
+              plan: "pro",
+              last_webhook_event: "invoice.paid",
+              last_webhook_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .eq("stripe_subscription_id", subscriptionId)
+            .select();
+
+          if (error) {
+            console.error("Error updating subscription:", error);
+          } else {
+            console.log("Subscription reactivated via invoice.paid, data:", data);
           }
         }
         break;
