@@ -35,8 +35,31 @@ serve(async (req) => {
       );
     }
 
-    const salonQuery = admin.from("salons").select("*");
-    const { data: salon, error: salonError } = salonId
+    // Selecionar apenas campos públicos - NÃO expor owner_id
+    const publicSalonFields = `
+      id,
+      name,
+      description,
+      welcome_text,
+      logo_url,
+      logo_format,
+      theme_preset,
+      custom_colors,
+      price_color,
+      service_color,
+      social_media,
+      opening_hours,
+      working_days,
+      stats,
+      appearance,
+      slug,
+      whatsapp,
+      created_at,
+      owner_id
+    `;
+    
+    const salonQuery = admin.from("salons").select(publicSalonFields);
+    const { data: salonData, error: salonError } = salonId
       ? await salonQuery.eq("id", salonId).maybeSingle()
       : await salonQuery.eq("slug", slug).maybeSingle();
 
@@ -48,18 +71,42 @@ serve(async (req) => {
       );
     }
 
-    if (!salon) {
+    if (!salonData) {
       console.log("public-salon-data: salon not found");
       return new Response(
         JSON.stringify({ salon: null, professionals: [], services: [], professionalServices: [], subscription: { isActive: false } }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
       );
     }
+    
+    // Extrair owner_id para uso interno, mas não expor na resposta
+    const ownerId = salonData.owner_id;
+    const salon = {
+      id: salonData.id,
+      name: salonData.name,
+      description: salonData.description,
+      welcome_text: salonData.welcome_text,
+      logo_url: salonData.logo_url,
+      logo_format: salonData.logo_format,
+      theme_preset: salonData.theme_preset,
+      custom_colors: salonData.custom_colors,
+      price_color: salonData.price_color,
+      service_color: salonData.service_color,
+      social_media: salonData.social_media,
+      opening_hours: salonData.opening_hours,
+      working_days: salonData.working_days,
+      stats: salonData.stats,
+      appearance: salonData.appearance,
+      slug: salonData.slug,
+      whatsapp: salonData.whatsapp,
+      created_at: salonData.created_at,
+      // owner_id NÃO é incluído na resposta pública
+    };
 
     const { data: subscription } = await admin
       .from("subscriptions")
       .select("status, plan, current_period_end")
-      .eq("user_id", salon.owner_id)
+      .eq("user_id", ownerId)
       .maybeSingle();
 
     const isSubscriptionActive = subscription?.status === "active";
