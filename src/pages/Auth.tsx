@@ -173,7 +173,7 @@ export default function Auth() {
                 />
               </div>
             </div>
-            <Button type="submit" variant="gradient" size="lg" className="w-full" disabled={isLoading}>
+            <Button type="submit" variant="gradient" size="default" className="w-full text-sm md:text-base" disabled={isLoading}>
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Entrar'}
             </Button>
             <div className="flex flex-col gap-2 text-center text-sm">
@@ -234,7 +234,7 @@ export default function Auth() {
                 />
               </div>
             </div>
-            <Button type="submit" variant="gradient" size="lg" className="w-full" disabled={isLoading}>
+            <Button type="submit" variant="gradient" size="default" className="w-full text-sm md:text-base" disabled={isLoading}>
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Criar Conta'}
             </Button>
             <p className="text-center text-sm text-muted-foreground">
@@ -262,7 +262,7 @@ export default function Auth() {
                 />
               </div>
             </div>
-            <Button type="submit" variant="gradient" size="lg" className="w-full" disabled={isLoading}>
+            <Button type="submit" variant="gradient" size="default" className="w-full text-sm md:text-base" disabled={isLoading}>
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Enviar Link'}
             </Button>
             <button
