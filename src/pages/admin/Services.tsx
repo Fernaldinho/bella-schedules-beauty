@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { SubscriptionGate } from '@/components/SubscriptionGate';
 import { Card } from '@/components/ui/card';
@@ -19,11 +19,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Pencil, Trash2, Clock, User } from 'lucide-react';
+import { Plus, Pencil, Trash2, Clock } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-
-type DbProfessional = { id: string; name: string; specialty: string | null };
 
 type UiService = {
   id: string;
@@ -31,7 +29,6 @@ type UiService = {
   price: number;
   duration: number;
   category: string;
-  professionalId: string;
 };
 
 export default function Services() {
@@ -39,22 +36,19 @@ export default function Services() {
   const [editingService, setEditingService] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [salonId, setSalonId] = useState<string | null>(null);
-
-  const [professionals, setProfessionals] = useState<DbProfessional[]>([]);
   const [services, setServices] = useState<UiService[]>([]);
 
   const [formData, setFormData] = useState({
     name: '',
     price: '',
     duration: '',
-    professionalId: '',
     category: '',
   });
 
   const categories = ['Cabelo', 'Unhas', 'Cílios', 'Depilação', 'Estética', 'Maquiagem', 'Geral'];
 
   const resetForm = () => {
-    setFormData({ name: '', price: '', duration: '', professionalId: '', category: '' });
+    setFormData({ name: '', price: '', duration: '', category: '' });
     setEditingService(null);
   };
 
@@ -68,19 +62,12 @@ export default function Services() {
     return mins > 0 ? `${hours}h ${mins}min` : `${hours}h`;
   };
 
-  const professionalById = useMemo(() => {
-    const map = new Map<string, DbProfessional>();
-    professionals.forEach((p) => map.set(p.id, p));
-    return map;
-  }, [professionals]);
-
   const loadAll = async () => {
     setIsLoading(true);
     try {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) {
         setSalonId(null);
-        setProfessionals([]);
         setServices([]);
         return;
       }
@@ -93,35 +80,18 @@ export default function Services() {
       if (salonError) throw salonError;
       if (!salon?.id) {
         setSalonId(null);
-        setProfessionals([]);
         setServices([]);
         return;
       }
       setSalonId(salon.id);
 
-      const [{ data: profs }, { data: svcs }, { data: ps }] = await Promise.all([
-        supabase
-          .from('professionals')
-          .select('id, name, specialty')
-          .eq('salon_id', salon.id)
-          .eq('is_active', true)
-          .order('created_at', { ascending: true }),
-        supabase
-          .from('services')
-          .select('id, name, price, duration, category')
-          .eq('salon_id', salon.id)
-          .eq('is_active', true)
-          .order('created_at', { ascending: true }),
-        supabase.from('professional_services').select('professional_id, service_id'),
-      ]);
+      const { data: svcs } = await supabase
+        .from('services')
+        .select('id, name, price, duration, category')
+        .eq('salon_id', salon.id)
+        .eq('is_active', true)
+        .order('created_at', { ascending: true });
 
-      const links = (ps || []) as { professional_id: string; service_id: string }[];
-      const serviceToProfessional = new Map<string, string>();
-      links.forEach((l) => {
-        if (!serviceToProfessional.has(l.service_id)) serviceToProfessional.set(l.service_id, l.professional_id);
-      });
-
-      setProfessionals((profs || []) as DbProfessional[]);
       setServices(
         ((svcs || []) as any[]).map((s) => ({
           id: s.id,
@@ -129,7 +99,6 @@ export default function Services() {
           price: Number(s.price),
           duration: s.duration,
           category: s.category || 'Geral',
-          professionalId: serviceToProfessional.get(s.id) || '',
         }))
       );
     } catch (e) {
@@ -142,7 +111,6 @@ export default function Services() {
 
   useEffect(() => {
     loadAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleEdit = (serviceId: string) => {
@@ -152,7 +120,6 @@ export default function Services() {
       name: service.name,
       price: String(service.price),
       duration: String(service.duration),
-      professionalId: service.professionalId,
       category: service.category,
     });
     setEditingService(serviceId);
@@ -162,6 +129,7 @@ export default function Services() {
   const handleDelete = async (serviceId: string) => {
     if (!salonId) return;
     try {
+      // Remove vínculos antigos (compatibilidade)
       await supabase.from('professional_services').delete().eq('service_id', serviceId);
       const { error } = await supabase.from('services').delete().eq('id', serviceId).eq('salon_id', salonId);
       if (error) throw error;
@@ -187,8 +155,6 @@ export default function Services() {
         is_active: true,
       };
 
-      let serviceId = editingService;
-
       if (editingService) {
         const { error } = await supabase
           .from('services')
@@ -197,25 +163,8 @@ export default function Services() {
           .eq('salon_id', salonId);
         if (error) throw error;
       } else {
-        const { data, error } = await supabase
-          .from('services')
-          .insert(payload)
-          .select('id')
-          .single();
+        const { error } = await supabase.from('services').insert(payload);
         if (error) throw error;
-        serviceId = data.id;
-      }
-
-      // Link professional 
-      if (serviceId) {
-        await supabase.from('professional_services').delete().eq('service_id', serviceId);
-        if (formData.professionalId) {
-          const { error } = await supabase.from('professional_services').insert({
-            professional_id: formData.professionalId,
-            service_id: serviceId,
-          });
-          if (error) throw error;
-        }
       }
 
       toast({ title: editingService ? 'Serviço atualizado com sucesso!' : 'Serviço criado com sucesso!' });
@@ -306,24 +255,6 @@ export default function Services() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="professional">Profissional</Label>
-                  <Select
-                    value={formData.professionalId}
-                    onValueChange={(value) => setFormData({ ...formData, professionalId: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione a profissional" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {professionals.map((prof) => (
-                        <SelectItem key={prof.id} value={prof.id}>
-                          {prof.name} {prof.specialty ? `- ${prof.specialty}` : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
                 <Button type="submit" variant="gradient" className="w-full">
                   {editingService ? 'Salvar Alterações' : 'Criar Serviço'}
                 </Button>
@@ -334,61 +265,51 @@ export default function Services() {
 
         <SubscriptionGate fallbackMessage="Assine o plano PRO para gerenciar seus serviços.">
           <div className="grid gap-4">
-            {services.map((service, index) => {
-              const professional = service.professionalId ? professionalById.get(service.professionalId) : undefined;
-
-              return (
-                <Card
-                  key={service.id}
-                  className="p-4 border-0 shadow-soft animate-fade-in"
-                  style={{ animationDelay: `${index * 50}ms` }}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 gradient-primary rounded-xl flex items-center justify-center">
-                        <span className="text-primary-foreground font-semibold text-lg">
-                          {service.name.charAt(0)}
-                        </span>
-                      </div>
-                      <div>
-                        <h3 className="font-medium text-foreground">{service.name}</h3>
-                        <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {formatDuration(service.duration)}
-                          </span>
-                          {professional && (
-                            <span className="flex items-center gap-1">
-                              <User className="w-3 h-3" />
-                              {professional.name}
-                            </span>
-                          )}
-                          <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs">
-                            {service.category}
-                          </span>
-                        </div>
-                      </div>
+            {services.map((service, index) => (
+              <Card
+                key={service.id}
+                className="p-4 border-0 shadow-soft animate-fade-in"
+                style={{ animationDelay: `${index * 50}ms` }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 gradient-primary rounded-xl flex items-center justify-center">
+                      <span className="text-primary-foreground font-semibold text-lg">
+                        {service.name.charAt(0)}
+                      </span>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <span className="text-lg font-semibold text-gradient">{formatPrice(service.price)}</span>
-                      <div className="flex gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => handleEdit(service.id)}>
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => void handleDelete(service.id)}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                    <div>
+                      <h3 className="font-medium text-foreground">{service.name}</h3>
+                      <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {formatDuration(service.duration)}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs">
+                          {service.category}
+                        </span>
                       </div>
                     </div>
                   </div>
-                </Card>
-              );
-            })}
+                  <div className="flex items-center gap-4">
+                    <span className="text-lg font-semibold text-gradient">{formatPrice(service.price)}</span>
+                    <div className="flex gap-2">
+                      <Button variant="ghost" size="icon" onClick={() => handleEdit(service.id)}>
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => void handleDelete(service.id)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            ))}
           </div>
         </SubscriptionGate>
       </div>
