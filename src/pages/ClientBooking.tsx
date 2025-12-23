@@ -85,6 +85,56 @@ export default function ClientBooking() {
     }
   }, [salonId, slug]);
 
+  // Window focus revalidation (multi-tab safe)
+  useEffect(() => {
+    const onFocus = () => {
+      console.log('[PUBLIC] Janela focada, revalidando dados...');
+      loadSalonData();
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [salonId, slug]);
+
+  // Realtime (best-effort): refresh public data when salon/services/professionals update
+  useEffect(() => {
+    if (!salon?.id) return;
+
+    console.log('[PUBLIC-REALTIME] Inscrevendo para atualizações do salão:', salon.id);
+
+    const channel = supabase
+      .channel(`public-salon-${salon.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'salons', filter: `id=eq.${salon.id}` },
+        () => {
+          console.log('[PUBLIC-REALTIME] Salão atualizado (revalidando)');
+          loadSalonData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'services', filter: `salon_id=eq.${salon.id}` },
+        () => {
+          console.log('[PUBLIC-REALTIME] Serviços atualizados (revalidando)');
+          loadSalonData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'professionals', filter: `salon_id=eq.${salon.id}` },
+        () => {
+          console.log('[PUBLIC-REALTIME] Profissionais atualizados (revalidando)');
+          loadSalonData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('[PUBLIC-REALTIME] Removendo inscrição');
+      supabase.removeChannel(channel);
+    };
+  }, [salon?.id]);
+
   useEffect(() => {
     if (salon) {
       applyTheme(salon);
