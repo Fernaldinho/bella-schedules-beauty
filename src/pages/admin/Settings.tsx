@@ -355,19 +355,14 @@ export default function Settings() {
                   <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center">
                     <Palette className="w-5 h-5 text-primary-foreground" />
                   </div>
-                  <h2 className="font-display font-semibold text-lg text-foreground">Tema Visual</h2>
+                  <h2 className="font-display font-semibold text-lg text-foreground">Aparência do Salão</h2>
                 </div>
-                <ThemeSelector currentTheme={formData.themePreset} customColors={formData.customColors} onThemeChange={handleThemeChange} onCustomColorsChange={handleCustomColorsChange} />
-              </Card>
-
-              <Card className="p-6 border-0 shadow-card">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center">
-                    <DollarSign className="w-5 h-5 text-primary-foreground" />
-                  </div>
-                  <h2 className="font-display font-semibold text-lg text-foreground">Cor dos Preços</h2>
-                </div>
-                <ColorPicker label="Cor para valores" value={formData.priceColor} onChange={(value) => setFormData({ ...formData, priceColor: value })} description="Aplicada nos preços exibidos." />
+                <ThemeSelector 
+                  currentTheme={formData.themePreset} 
+                  customColors={formData.customColors} 
+                  onThemeChange={handleThemeChange} 
+                  onCustomColorsChange={handleCustomColorsChange} 
+                />
               </Card>
 
               <Card className="p-6 border-0 shadow-card">
