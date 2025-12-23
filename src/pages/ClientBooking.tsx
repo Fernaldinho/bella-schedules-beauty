@@ -371,22 +371,27 @@ export default function ClientBooking() {
     
     setIsSubmitting(true);
     try {
-      const { error } = await supabase.from('appointments').insert({
-        salon_id: salon.id,
-        professional_id: selectedProfessional.id,
-        service_id: selectedService.id,
-        date: format(selectedDate, 'yyyy-MM-dd'),
-        time: selectedTime,
-        client_name: clientName,
-        client_phone: clientPhone.replace(/\D/g, ''),
-        status: 'confirmed'
+      // Usar edge function segura para criar agendamento
+      const { data, error } = await supabase.functions.invoke('create-appointment', {
+        body: {
+          salonId: salon.id,
+          professionalId: selectedProfessional.id,
+          serviceId: selectedService.id,
+          date: format(selectedDate, 'yyyy-MM-dd'),
+          time: selectedTime,
+          clientName: clientName.trim(),
+          clientPhone: clientPhone.replace(/\D/g, ''),
+        }
       });
 
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      
       setStep('success');
     } catch (error) {
       console.error('Error booking:', error);
-      toast({ title: 'Erro ao agendar', variant: 'destructive' });
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao agendar';
+      toast({ title: errorMessage, variant: 'destructive' });
     } finally {
       setIsSubmitting(false);
     }
