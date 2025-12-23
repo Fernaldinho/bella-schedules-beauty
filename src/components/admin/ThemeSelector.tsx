@@ -2,39 +2,41 @@ import { useState, useEffect, useMemo } from 'react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Crown, Sparkles, Zap, Leaf, Target, Check, Palette } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Crown, Sparkles, Zap, Leaf, Target, Check, Palette, AlertCircle } from 'lucide-react';
 import { SalonStyle, ButtonEmphasis, SalonAppearance, CustomColors, ThemePreset } from '@/types/salon';
+import { toast } from '@/hooks/use-toast';
 
 // Paletas base por estilo
 const STYLE_PALETTES: Record<SalonStyle, { primary: string; secondary: string; support: string; description: string }> = {
   luxo: {
-    primary: '45 80% 45%',      // Dourado
-    secondary: '30 15% 20%',    // Marrom escuro
-    support: '45 60% 70%',      // Champagne
+    primary: '45 80% 45%',
+    secondary: '30 15% 20%',
+    support: '45 60% 70%',
     description: 'Cores sofisticadas com dourado e tons escuros'
   },
   delicado: {
-    primary: '340 60% 70%',     // Rosa suave
-    secondary: '280 40% 85%',   // Lavanda claro
-    support: '20 50% 90%',      // Pêssego
+    primary: '340 60% 70%',
+    secondary: '280 40% 85%',
+    support: '20 50% 90%',
     description: 'Tons pastéis e românticos'
   },
   moderno: {
-    primary: '220 80% 55%',     // Azul vibrante
-    secondary: '260 70% 60%',   // Roxo moderno
-    support: '180 60% 50%',     // Ciano
+    primary: '220 80% 55%',
+    secondary: '260 70% 60%',
+    support: '180 60% 50%',
     description: 'Cores vibrantes e contemporâneas'
   },
   natural: {
-    primary: '140 50% 40%',     // Verde floresta
-    secondary: '30 40% 60%',    // Bege natural
-    support: '80 40% 50%',      // Verde oliva
+    primary: '140 50% 40%',
+    secondary: '30 40% 60%',
+    support: '80 40% 50%',
     description: 'Tons terrosos e orgânicos'
   },
   impactante: {
-    primary: '0 80% 50%',       // Vermelho vibrante
-    secondary: '280 100% 40%',  // Roxo intenso
-    support: '30 100% 50%',     // Laranja
+    primary: '0 80% 50%',
+    secondary: '280 100% 40%',
+    support: '30 100% 50%',
     description: 'Cores fortes e marcantes'
   }
 };
@@ -53,13 +55,21 @@ const EMPHASIS_OPTIONS: { value: ButtonEmphasis; label: string; description: str
   { value: 'chamativo', label: 'Chamativo', description: 'Máximo destaque para conversão' },
 ];
 
+// Default appearance
+const DEFAULT_APPEARANCE: SalonAppearance = {
+  style: 'moderno',
+  colorMode: 'no_colors',
+  colorCount: 1,
+  primaryColor: '220 80% 55%',
+  secondaryColor: '260 70% 60%',
+  supportColor: '180 60% 50%',
+  buttonEmphasis: 'equilibrado'
+};
+
 interface ThemeSelectorProps {
-  currentTheme: ThemePreset;
-  customColors: CustomColors;
-  onThemeChange: (theme: ThemePreset) => void;
-  onCustomColorsChange: (colors: CustomColors) => void;
-  appearance?: SalonAppearance;
-  onAppearanceChange?: (appearance: SalonAppearance) => void;
+  savedAppearance?: SalonAppearance | null;
+  onApply: (appearance: SalonAppearance) => void;
+  hasUnappliedChanges?: boolean;
 }
 
 // Funções auxiliares de cor
@@ -132,7 +142,7 @@ const adjustBrightness = (hsl: string, amount: number): string => {
 };
 
 // Cores calculadas para preview
-interface ComputedColors {
+export interface ComputedColors {
   buttonBackground: string;
   buttonText: string;
   gradientStart: string;
@@ -141,22 +151,18 @@ interface ComputedColors {
 }
 
 // Calcula cores finais baseado nas configurações
-const computeColors = (appearance: SalonAppearance): ComputedColors => {
+export const computeColors = (appearance: SalonAppearance): ComputedColors => {
   const { style, colorMode, primaryColor, secondaryColor, buttonEmphasis } = appearance;
   
-  // Se não tem cores, usa a paleta do estilo
   const basePrimary = colorMode === 'no_colors' ? STYLE_PALETTES[style].primary : primaryColor;
   const baseSecondary = colorMode === 'no_colors' ? STYLE_PALETTES[style].secondary : secondaryColor;
   
-  // Calcular cor do botão baseado no destaque
   let buttonBg = basePrimary;
-  let buttonTextColor = '0 0% 100%'; // Branco por padrão
+  let buttonTextColor = '0 0% 100%';
   
-  // Ajustar saturação/brilho baseado no destaque
   if (buttonEmphasis === 'discreto') {
     buttonBg = adjustBrightness(basePrimary, 10);
   } else if (buttonEmphasis === 'chamativo') {
-    // Aumentar saturação
     const parts = basePrimary.split(' ');
     const h = parts[0];
     const s = Math.min(100, parseFloat(parts[1]?.replace('%', '') || '60') + 20);
@@ -164,11 +170,9 @@ const computeColors = (appearance: SalonAppearance): ComputedColors => {
     buttonBg = `${h} ${s}% ${l}`;
   }
   
-  // Determinar cor do texto automaticamente
   const luminance = getLuminance(buttonBg);
   buttonTextColor = luminance > 55 ? '0 0% 10%' : '0 0% 100%';
   
-  // Gerar degradê
   const gradientStart = adjustBrightness(baseSecondary, 15);
   const gradientEnd = adjustBrightness(basePrimary, -10);
   
@@ -182,7 +186,7 @@ const computeColors = (appearance: SalonAppearance): ComputedColors => {
 };
 
 // Converte appearance para CustomColors (compatibilidade)
-const appearanceToCustomColors = (appearance: SalonAppearance): CustomColors => {
+export const appearanceToCustomColors = (appearance: SalonAppearance): CustomColors => {
   const computed = computeColors(appearance);
   return {
     primary: computed.buttonBackground,
@@ -192,79 +196,86 @@ const appearanceToCustomColors = (appearance: SalonAppearance): CustomColors => 
   };
 };
 
+// Compare two appearances
+const appearancesEqual = (a: SalonAppearance, b: SalonAppearance): boolean => {
+  return (
+    a.style === b.style &&
+    a.colorMode === b.colorMode &&
+    a.colorCount === b.colorCount &&
+    a.primaryColor === b.primaryColor &&
+    a.secondaryColor === b.secondaryColor &&
+    a.supportColor === b.supportColor &&
+    a.buttonEmphasis === b.buttonEmphasis
+  );
+};
+
 export function ThemeSelector({
-  customColors,
-  onCustomColorsChange,
-  onThemeChange,
-  appearance: externalAppearance,
-  onAppearanceChange
+  savedAppearance,
+  onApply,
 }: ThemeSelectorProps) {
   const [step, setStep] = useState<'style' | 'colors' | 'emphasis'>('style');
-  const [appearance, setAppearance] = useState<SalonAppearance>(() => {
-    if (externalAppearance) return externalAppearance;
-    return {
-      style: 'moderno',
-      colorMode: 'no_colors',
-      colorCount: 1,
-      primaryColor: '220 80% 55%',
-      secondaryColor: '260 70% 60%',
-      supportColor: '180 60% 50%',
-      buttonEmphasis: 'equilibrado'
-    };
+  
+  // Draft state - used for editing/preview
+  const [draft, setDraft] = useState<SalonAppearance>(() => {
+    return savedAppearance || DEFAULT_APPEARANCE;
   });
 
-  // Sincronizar com appearance externo
+  // Sync draft with saved when savedAppearance changes (e.g., on load)
   useEffect(() => {
-    if (externalAppearance) {
-      setAppearance(externalAppearance);
+    if (savedAppearance) {
+      setDraft(savedAppearance);
     }
-  }, [externalAppearance]);
+  }, [savedAppearance]);
 
-  // Cores calculadas para preview
-  const computedColors = useMemo(() => computeColors(appearance), [appearance]);
+  // Check if draft differs from saved
+  const hasChanges = useMemo(() => {
+    if (!savedAppearance) return true;
+    return !appearancesEqual(draft, savedAppearance);
+  }, [draft, savedAppearance]);
 
-  // Atualizar customColors quando appearance muda
-  useEffect(() => {
-    const newColors = appearanceToCustomColors(appearance);
-    onCustomColorsChange(newColors);
-    onThemeChange('custom'); // Sempre usar custom quando usando o novo fluxo
-    onAppearanceChange?.(appearance);
-  }, [appearance]);
+  // Computed colors for preview (always uses draft)
+  const computedColors = useMemo(() => computeColors(draft), [draft]);
 
-  const updateAppearance = (updates: Partial<SalonAppearance>) => {
-    setAppearance(prev => ({ ...prev, ...updates }));
+  const updateDraft = (updates: Partial<SalonAppearance>) => {
+    setDraft(prev => ({ ...prev, ...updates }));
   };
 
   const handleStyleChange = (style: SalonStyle) => {
     const palette = STYLE_PALETTES[style];
-    updateAppearance({
+    updateDraft({
       style,
-      primaryColor: appearance.colorMode === 'no_colors' ? palette.primary : appearance.primaryColor,
-      secondaryColor: appearance.colorMode === 'no_colors' ? palette.secondary : appearance.secondaryColor,
-      supportColor: appearance.colorMode === 'no_colors' ? palette.support : appearance.supportColor,
+      primaryColor: draft.colorMode === 'no_colors' ? palette.primary : draft.primaryColor,
+      secondaryColor: draft.colorMode === 'no_colors' ? palette.secondary : draft.secondaryColor,
+      supportColor: draft.colorMode === 'no_colors' ? palette.support : draft.supportColor,
     });
   };
 
   const handleColorModeChange = (mode: 'has_colors' | 'no_colors') => {
-    const palette = STYLE_PALETTES[appearance.style];
-    updateAppearance({
+    const palette = STYLE_PALETTES[draft.style];
+    updateDraft({
       colorMode: mode,
-      primaryColor: mode === 'no_colors' ? palette.primary : appearance.primaryColor,
-      secondaryColor: mode === 'no_colors' ? palette.secondary : appearance.secondaryColor,
+      primaryColor: mode === 'no_colors' ? palette.primary : draft.primaryColor,
+      secondaryColor: mode === 'no_colors' ? palette.secondary : draft.secondaryColor,
+    });
+  };
+
+  const handleApply = () => {
+    onApply(draft);
+    toast({
+      title: 'Tema aplicado!',
+      description: 'Clique em "Salvar" para persistir as alterações.',
     });
   };
 
   // Preview Component
   const Preview = () => (
     <div className="relative rounded-xl overflow-hidden border border-border shadow-lg">
-      {/* Background gradient */}
       <div 
         className="h-40 relative"
         style={{ 
           background: `linear-gradient(135deg, hsl(${computedColors.gradientStart}), hsl(${computedColors.gradientEnd}))`
         }}
       >
-        {/* Simulated content */}
         <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
           <div className="text-center mb-4">
             <div className="w-12 h-12 rounded-full bg-white/20 mx-auto mb-2" />
@@ -272,7 +283,6 @@ export function ThemeSelector({
             <p className="text-white/70 text-xs">Agende seu horário</p>
           </div>
           
-          {/* Preview button */}
           <button
             className="px-6 py-2.5 rounded-full text-sm font-medium transition-all shadow-lg"
             style={{ 
@@ -285,7 +295,6 @@ export function ThemeSelector({
         </div>
       </div>
       
-      {/* Bottom section */}
       <div className="bg-background p-3 border-t border-border">
         <div className="flex items-center justify-between text-xs">
           <span className="text-muted-foreground">Preview em tempo real</span>
@@ -359,7 +368,7 @@ export function ThemeSelector({
               </div>
               
               <RadioGroup 
-                value={appearance.style} 
+                value={draft.style} 
                 onValueChange={(v) => handleStyleChange(v as SalonStyle)}
                 className="grid gap-3"
               >
@@ -367,14 +376,14 @@ export function ThemeSelector({
                   <Label
                     key={option.value}
                     className={`flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                      appearance.style === option.value
+                      draft.style === option.value
                         ? 'border-primary bg-primary/5'
                         : 'border-border hover:border-primary/50'
                     }`}
                   >
                     <RadioGroupItem value={option.value} className="sr-only" />
                     <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                      appearance.style === option.value
+                      draft.style === option.value
                         ? 'bg-primary text-primary-foreground'
                         : 'bg-muted text-muted-foreground'
                     }`}>
@@ -384,7 +393,7 @@ export function ThemeSelector({
                       <p className="font-medium text-foreground">{option.label}</p>
                       <p className="text-sm text-muted-foreground">{option.description}</p>
                     </div>
-                    {appearance.style === option.value && (
+                    {draft.style === option.value && (
                       <Check className="w-5 h-5 text-primary" />
                     )}
                   </Label>
@@ -410,20 +419,20 @@ export function ThemeSelector({
               </div>
               
               <RadioGroup 
-                value={appearance.colorMode} 
+                value={draft.colorMode} 
                 onValueChange={(v) => handleColorModeChange(v as 'has_colors' | 'no_colors')}
                 className="grid gap-3"
               >
                 <Label
                   className={`flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                    appearance.colorMode === 'has_colors'
+                    draft.colorMode === 'has_colors'
                       ? 'border-primary bg-primary/5'
                       : 'border-border hover:border-primary/50'
                   }`}
                 >
                   <RadioGroupItem value="has_colors" className="sr-only" />
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                    appearance.colorMode === 'has_colors'
+                    draft.colorMode === 'has_colors'
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-muted text-muted-foreground'
                   }`}>
@@ -433,19 +442,19 @@ export function ThemeSelector({
                     <p className="font-medium text-foreground">Já tenho cores</p>
                     <p className="text-sm text-muted-foreground">Vou informar as cores do meu salão</p>
                   </div>
-                  {appearance.colorMode === 'has_colors' && <Check className="w-5 h-5 text-primary" />}
+                  {draft.colorMode === 'has_colors' && <Check className="w-5 h-5 text-primary" />}
                 </Label>
                 
                 <Label
                   className={`flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                    appearance.colorMode === 'no_colors'
+                    draft.colorMode === 'no_colors'
                       ? 'border-primary bg-primary/5'
                       : 'border-border hover:border-primary/50'
                   }`}
                 >
                   <RadioGroupItem value="no_colors" className="sr-only" />
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                    appearance.colorMode === 'no_colors'
+                    draft.colorMode === 'no_colors'
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-muted text-muted-foreground'
                   }`}>
@@ -453,14 +462,14 @@ export function ThemeSelector({
                   </div>
                   <div className="flex-1">
                     <p className="font-medium text-foreground">Não tenho cores</p>
-                    <p className="text-sm text-muted-foreground">Criar paleta automática baseada no estilo "{STYLE_OPTIONS.find(s => s.value === appearance.style)?.label}"</p>
+                    <p className="text-sm text-muted-foreground">Criar paleta automática baseada no estilo "{STYLE_OPTIONS.find(s => s.value === draft.style)?.label}"</p>
                   </div>
-                  {appearance.colorMode === 'no_colors' && <Check className="w-5 h-5 text-primary" />}
+                  {draft.colorMode === 'no_colors' && <Check className="w-5 h-5 text-primary" />}
                 </Label>
               </RadioGroup>
 
               {/* Color pickers when has_colors */}
-              {appearance.colorMode === 'has_colors' && (
+              {draft.colorMode === 'has_colors' && (
                 <div className="space-y-4 p-4 rounded-xl bg-muted/50">
                   <div>
                     <Label className="text-sm mb-2 block">Quantas cores você usa?</Label>
@@ -469,9 +478,9 @@ export function ThemeSelector({
                         <button
                           key={num}
                           type="button"
-                          onClick={() => updateAppearance({ colorCount: num })}
+                          onClick={() => updateDraft({ colorCount: num })}
                           className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                            appearance.colorCount === num
+                            draft.colorCount === num
                               ? 'bg-primary text-primary-foreground'
                               : 'bg-background border border-border hover:border-primary/50'
                           }`}
@@ -484,23 +493,23 @@ export function ThemeSelector({
                   
                   <ColorInput 
                     label="Cor principal" 
-                    value={appearance.primaryColor}
-                    onChange={(v) => updateAppearance({ primaryColor: v })}
+                    value={draft.primaryColor}
+                    onChange={(v) => updateDraft({ primaryColor: v })}
                   />
                   
-                  {appearance.colorCount >= 2 && (
+                  {draft.colorCount >= 2 && (
                     <ColorInput 
                       label="Cor secundária" 
-                      value={appearance.secondaryColor}
-                      onChange={(v) => updateAppearance({ secondaryColor: v })}
+                      value={draft.secondaryColor}
+                      onChange={(v) => updateDraft({ secondaryColor: v })}
                     />
                   )}
                   
-                  {appearance.colorCount >= 3 && (
+                  {draft.colorCount >= 3 && (
                     <ColorInput 
                       label="Cor de apoio" 
-                      value={appearance.supportColor}
-                      onChange={(v) => updateAppearance({ supportColor: v })}
+                      value={draft.supportColor}
+                      onChange={(v) => updateDraft({ supportColor: v })}
                     />
                   )}
                 </div>
@@ -534,15 +543,15 @@ export function ThemeSelector({
               </div>
               
               <RadioGroup 
-                value={appearance.buttonEmphasis} 
-                onValueChange={(v) => updateAppearance({ buttonEmphasis: v as ButtonEmphasis })}
+                value={draft.buttonEmphasis} 
+                onValueChange={(v) => updateDraft({ buttonEmphasis: v as ButtonEmphasis })}
                 className="grid gap-3"
               >
                 {EMPHASIS_OPTIONS.map((option) => (
                   <Label
                     key={option.value}
                     className={`flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                      appearance.buttonEmphasis === option.value
+                      draft.buttonEmphasis === option.value
                         ? 'border-primary bg-primary/5'
                         : 'border-border hover:border-primary/50'
                     }`}
@@ -552,7 +561,7 @@ export function ThemeSelector({
                       <p className="font-medium text-foreground">{option.label}</p>
                       <p className="text-sm text-muted-foreground">{option.description}</p>
                     </div>
-                    {appearance.buttonEmphasis === option.value && (
+                    {draft.buttonEmphasis === option.value && (
                       <Check className="w-5 h-5 text-primary" />
                     )}
                   </Label>
@@ -570,14 +579,14 @@ export function ThemeSelector({
           )}
         </div>
 
-        {/* Right: Preview */}
+        {/* Right: Preview + Apply button */}
         <div className="space-y-4">
           <h3 className="font-medium text-foreground">Preview da página</h3>
           <Preview />
           
           {/* Color summary */}
           <div className="p-4 rounded-xl bg-muted/50 space-y-3">
-            <p className="text-sm font-medium text-foreground">Cores aplicadas:</p>
+            <p className="text-sm font-medium text-foreground">Cores do preview:</p>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 rounded" style={{ backgroundColor: `hsl(${computedColors.buttonBackground})` }} />
@@ -597,11 +606,36 @@ export function ThemeSelector({
               </div>
             </div>
           </div>
+
+          {/* Apply button */}
+          <div className="space-y-2">
+            {hasChanges && (
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                <AlertCircle className="w-4 h-4 text-amber-500" />
+                <span className="text-sm text-amber-600 dark:text-amber-400">Alterações não aplicadas</span>
+              </div>
+            )}
+            <Button
+              type="button"
+              onClick={handleApply}
+              disabled={!hasChanges}
+              variant="gradient"
+              className="w-full"
+            >
+              {hasChanges ? 'Aplicar Tema' : 'Tema Aplicado'}
+            </Button>
+            <p className="text-xs text-muted-foreground text-center">
+              Clique em "Aplicar" para ver o tema na página, depois em "Salvar" para persistir.
+            </p>
+          </div>
         </div>
       </div>
     </div>
   );
 }
+
+// Export for external usage
+export { DEFAULT_APPEARANCE };
 
 // Exportar função para compatibilidade
 export function getThemeCSS(theme: ThemePreset, customColors?: CustomColors): Record<string, string> {
